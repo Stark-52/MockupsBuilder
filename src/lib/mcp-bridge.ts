@@ -11,6 +11,7 @@ import { useEditorStore } from "./store";
 import { DEVICES } from "./devices";
 import { TEMPLATES } from "./templates";
 import { BACKGROUND_PATTERNS } from "./patterns";
+import { ICON_NAMES, ICON_CATEGORIES } from "./icons";
 import type { CanvasElement, Screen } from "./types";
 
 const WS_URL = `ws://localhost:${process.env.NEXT_PUBLIC_MCP_WS_PORT || 3333}`;
@@ -281,6 +282,103 @@ function dispatch(method: string, p: Params): unknown {
       return { ok: true, id: el.id };
     }
 
+    case "add_circle": {
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "circle",
+        x: num(p.x, 0),
+        y: num(p.y, 0),
+        width: num(p.width, 200),
+        height: num(p.height, 200),
+        rotation: num(p.rotation, 0),
+        opacity: num(p.opacity, 1),
+        visible: true,
+        locked: false,
+        name: str(p.name, "Circle"),
+        fill: str(p.fill, "#8b5cf6"),
+        stroke: str(p.stroke, ""),
+        strokeWidth: num(p.strokeWidth, 0),
+        ...(p.gradient ? { gradient: p.gradient as import("./types").GradientConfig } : {}),
+      };
+      store.addElement(el);
+      return { ok: true, id: el.id };
+    }
+
+    case "add_line": {
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "line",
+        x: num(p.x, 0),
+        y: num(p.y, 0),
+        width: num(p.width, 300),
+        height: num(p.height, 0),
+        rotation: num(p.rotation, 0),
+        opacity: num(p.opacity, 1),
+        visible: true,
+        locked: false,
+        name: str(p.name, "Line"),
+        stroke: str(p.stroke, "#ffffff"),
+        strokeWidth: num(p.strokeWidth, 4),
+        lineStart: (p.lineStart as "none" | "arrow" | "dot") || "none",
+        lineEnd: (p.lineEnd as "none" | "arrow" | "dot") || "none",
+        ...(p.dash ? { dash: [10, 5] } : {}),
+      };
+      store.addElement(el);
+      return { ok: true, id: el.id };
+    }
+
+    case "add_star": {
+      const size = num(p.width, 200);
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "star",
+        x: num(p.x, 0),
+        y: num(p.y, 0),
+        width: size,
+        height: size,
+        rotation: num(p.rotation, 0),
+        opacity: num(p.opacity, 1),
+        visible: true,
+        locked: false,
+        name: str(p.name, "Star"),
+        fill: str(p.fill, "#fbbf24"),
+        stroke: str(p.stroke, ""),
+        strokeWidth: num(p.strokeWidth, 0),
+        numPoints: num(p.numPoints, 5),
+        innerRadiusRatio: num(p.innerRadiusRatio, 0.4),
+        ...(p.gradient ? { gradient: p.gradient as import("./types").GradientConfig } : {}),
+      };
+      store.addElement(el);
+      return { ok: true, id: el.id };
+    }
+
+    case "add_icon": {
+      const iconName = str(p.iconName, "star");
+      if (!ICON_NAMES.includes(iconName)) throw new Error(`Unknown icon: ${iconName}. Use get_icons to list available icons.`);
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "icon",
+        x: num(p.x, 0),
+        y: num(p.y, 0),
+        width: num(p.width, 150),
+        height: num(p.height, 150),
+        rotation: num(p.rotation, 0),
+        opacity: num(p.opacity, 1),
+        visible: true,
+        locked: false,
+        name: str(p.name, iconName),
+        iconName,
+        fill: str(p.fill, "#ffffff"),
+        stroke: str(p.stroke, ""),
+        strokeWidth: num(p.strokeWidth, 0),
+      };
+      store.addElement(el);
+      return { ok: true, id: el.id };
+    }
+
+    case "get_icons":
+      return { names: ICON_NAMES, categories: ICON_CATEGORIES };
+
     // ── Element Modification ────────────────────────────────────
     case "update_element": {
       const id = str(p.id, "");
@@ -295,9 +393,20 @@ function dispatch(method: string, p: Params): unknown {
         "text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "fill", "align", "lineHeight", "autoFit",
         "stroke", "strokeWidth", "cornerRadius", "clipImageSrc", "gradient",
         "src", "deviceId", "screenshotSrc",
+        // New element types
+        "lineStart", "lineEnd", "dash",
+        "numPoints", "innerRadiusRatio",
+        "iconName",
+        // Effects
+        "blurEnabled", "blurRadius", "flipX", "flipY",
+        "strokeColor",
       ];
       for (const key of allowed) {
         if (p[key] !== undefined) updates[key] = p[key];
+      }
+      // Handle text stroke width mapping (textStrokeWidth → strokeWidth for text elements)
+      if (p.textStrokeWidth !== undefined && el.type === "text") {
+        updates.strokeWidth = p.textStrokeWidth;
       }
       store.pushHistory();
       store.updateElement(id, updates as Partial<CanvasElement>);
@@ -463,10 +572,17 @@ function summarizeElement(el: CanvasElement) {
     height: el.height,
     visible: el.visible,
     locked: el.locked,
+    ...(el.blurEnabled ? { blurEnabled: true, blurRadius: el.blurRadius } : {}),
+    ...(el.flipX ? { flipX: true } : {}),
+    ...(el.flipY ? { flipY: true } : {}),
   };
   if (el.type === "text") return { ...base, text: el.text, fontSize: el.fontSize, fill: el.fill };
   if (el.type === "rectangle") return { ...base, fill: el.fill, cornerRadius: el.cornerRadius };
   if (el.type === "image") return { ...base, hasImage: !!el.src };
   if (el.type === "device-frame") return { ...base, deviceId: el.deviceId };
+  if (el.type === "circle") return { ...base, fill: el.fill };
+  if (el.type === "line") return { ...base, stroke: el.stroke, lineStart: el.lineStart, lineEnd: el.lineEnd };
+  if (el.type === "star") return { ...base, fill: el.fill, numPoints: el.numPoints, innerRadiusRatio: el.innerRadiusRatio };
+  if (el.type === "icon") return { ...base, iconName: el.iconName, fill: el.fill };
   return base;
 }

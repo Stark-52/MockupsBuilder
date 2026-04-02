@@ -1,8 +1,10 @@
 "use client";
 
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, TextElement, RectangleElement, ImageElement, DeviceFrameElement, GradientConfig, GradientStop } from "@/lib/types";
+import { CanvasElement, TextElement, RectangleElement, ImageElement, DeviceFrameElement, GradientConfig, GradientStop, CircleElement, LineElement, StarElement, IconElement } from "@/lib/types";
 import { DEVICES } from "@/lib/devices";
+import { ICON_NAMES, ICON_CATEGORIES } from "@/lib/icons";
+import { ColorPicker } from "./ColorPicker";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -25,6 +27,8 @@ import {
   AlignEndVertical,
   AlignHorizontalSpaceBetween,
   AlignVerticalSpaceBetween,
+  FlipHorizontal2,
+  FlipVertical2,
 } from "lucide-react";
 
 const GRADIENT_PRESETS: { name: string; gradient: GradientConfig }[] = [
@@ -371,25 +375,13 @@ export function RightSidebar() {
               <div className="space-y-2">
                 <SectionHeader>Canvas Background</SectionHeader>
                 {!backgroundGradient && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={backgroundColor}
-                      onChange={(e) => {
-                        pushHistory();
-                        setBackgroundColor(e.target.value);
-                      }}
-                      className="h-8 w-8 rounded border border-border cursor-pointer"
-                    />
-                    <Input
-                      value={backgroundColor}
-                      onChange={(e) => {
-                        pushHistory();
-                        setBackgroundColor(e.target.value);
-                      }}
-                      className="h-7 text-xs flex-1"
-                    />
-                  </div>
+                  <ColorPicker
+                    value={backgroundColor}
+                    onChange={(color) => {
+                      pushHistory();
+                      setBackgroundColor(color);
+                    }}
+                  />
                 )}
                 <GradientEditor
                   gradient={backgroundGradient}
@@ -635,23 +627,12 @@ export function RightSidebar() {
                     </div>
                   </PropertyRow>
                   <PropertyRow label="Color">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={(selected as TextElement).fill}
-                        onChange={(e) =>
-                          update({ fill: e.target.value } as Partial<TextElement>)
-                        }
-                        className="h-7 w-7 rounded border border-border cursor-pointer"
-                      />
-                      <Input
-                        className="h-7 text-xs flex-1"
-                        value={(selected as TextElement).fill}
-                        onChange={(e) =>
-                          update({ fill: e.target.value } as Partial<TextElement>)
-                        }
-                      />
-                    </div>
+                    <ColorPicker
+                      value={(selected as TextElement).fill}
+                      onChange={(color) =>
+                        update({ fill: color } as Partial<TextElement>)
+                      }
+                    />
                   </PropertyRow>
                   <PropertyRow label="Line H">
                     <NumberInput
@@ -731,43 +712,21 @@ export function RightSidebar() {
                   />
                   {!(selected as RectangleElement).gradient && (
                   <PropertyRow label="Fill">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={(selected as RectangleElement).fill || "#000000"}
-                        onChange={(e) =>
-                          update({ fill: e.target.value } as Partial<RectangleElement>)
-                        }
-                        className="h-7 w-7 rounded border border-border cursor-pointer"
-                      />
-                      <Input
-                        className="h-7 text-xs flex-1"
-                        value={(selected as RectangleElement).fill}
-                        onChange={(e) =>
-                          update({ fill: e.target.value } as Partial<RectangleElement>)
-                        }
-                      />
-                    </div>
+                    <ColorPicker
+                      value={(selected as RectangleElement).fill || "#000000"}
+                      onChange={(color) =>
+                        update({ fill: color } as Partial<RectangleElement>)
+                      }
+                    />
                   </PropertyRow>
                   )}
                   <PropertyRow label="Stroke">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={(selected as RectangleElement).stroke || "#000000"}
-                        onChange={(e) =>
-                          update({ stroke: e.target.value } as Partial<RectangleElement>)
-                        }
-                        className="h-7 w-7 rounded border border-border cursor-pointer"
-                      />
-                      <Input
-                        className="h-7 text-xs flex-1"
-                        value={(selected as RectangleElement).stroke}
-                        onChange={(e) =>
-                          update({ stroke: e.target.value } as Partial<RectangleElement>)
-                        }
-                      />
-                    </div>
+                    <ColorPicker
+                      value={(selected as RectangleElement).stroke || "#000000"}
+                      onChange={(color) =>
+                        update({ stroke: color } as Partial<RectangleElement>)
+                      }
+                    />
                   </PropertyRow>
                   <PropertyRow label="Stroke W">
                     <NumberInput
@@ -920,6 +879,359 @@ export function RightSidebar() {
                   </PropertyRow>
                 </div>
               )}
+
+              {/* Circle Properties */}
+              {selected.type === "circle" && (
+                <div className="space-y-2">
+                  <SectionHeader>Circle</SectionHeader>
+                  <GradientEditor
+                    gradient={(selected as CircleElement).gradient}
+                    label="Fill Mode"
+                    onChange={(g) => update({ gradient: g || undefined } as Partial<CircleElement>)}
+                  />
+                  {!(selected as CircleElement).gradient && (
+                    <PropertyRow label="Fill">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={(selected as CircleElement).fill || "#000000"}
+                          onChange={(e) => update({ fill: e.target.value } as Partial<CircleElement>)}
+                          className="h-7 w-7 rounded border border-border cursor-pointer"
+                        />
+                        <Input
+                          className="h-7 text-xs flex-1"
+                          value={(selected as CircleElement).fill}
+                          onChange={(e) => update({ fill: e.target.value } as Partial<CircleElement>)}
+                        />
+                      </div>
+                    </PropertyRow>
+                  )}
+                  <PropertyRow label="Stroke">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={(selected as CircleElement).stroke || "#000000"}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<CircleElement>)}
+                        className="h-7 w-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        className="h-7 text-xs flex-1"
+                        value={(selected as CircleElement).stroke}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<CircleElement>)}
+                      />
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Stroke W">
+                    <NumberInput
+                      value={(selected as CircleElement).strokeWidth}
+                      onChange={(v) => update({ strokeWidth: v } as Partial<CircleElement>)}
+                    />
+                  </PropertyRow>
+                </div>
+              )}
+
+              {/* Line Properties */}
+              {selected.type === "line" && (
+                <div className="space-y-2">
+                  <SectionHeader>Line</SectionHeader>
+                  <PropertyRow label="Stroke">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={(selected as LineElement).stroke || "#ffffff"}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<LineElement>)}
+                        className="h-7 w-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        className="h-7 text-xs flex-1"
+                        value={(selected as LineElement).stroke}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<LineElement>)}
+                      />
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Width">
+                    <NumberInput
+                      value={(selected as LineElement).strokeWidth}
+                      onChange={(v) => update({ strokeWidth: v } as Partial<LineElement>)}
+                    />
+                  </PropertyRow>
+                  <PropertyRow label="Start">
+                    <Select
+                      value={(selected as LineElement).lineStart}
+                      onValueChange={(v: string | null) => {
+                        if (v) update({ lineStart: v as "none" | "arrow" | "dot" } as Partial<LineElement>);
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="arrow">Arrow</SelectItem>
+                        <SelectItem value="dot">Dot</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+                  <PropertyRow label="End">
+                    <Select
+                      value={(selected as LineElement).lineEnd}
+                      onValueChange={(v: string | null) => {
+                        if (v) update({ lineEnd: v as "none" | "arrow" | "dot" } as Partial<LineElement>);
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="arrow">Arrow</SelectItem>
+                        <SelectItem value="dot">Dot</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-muted-foreground">Dashed</Label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!((selected as LineElement).dash?.length)}
+                        onChange={(e) => {
+                          update({ dash: e.target.checked ? [10, 5] : undefined } as Partial<LineElement>);
+                        }}
+                        className="h-3 w-3 rounded border-border accent-primary"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Star Properties */}
+              {selected.type === "star" && (
+                <div className="space-y-2">
+                  <SectionHeader>Star</SectionHeader>
+                  <GradientEditor
+                    gradient={(selected as StarElement).gradient}
+                    label="Fill Mode"
+                    onChange={(g) => update({ gradient: g || undefined } as Partial<StarElement>)}
+                  />
+                  {!(selected as StarElement).gradient && (
+                    <PropertyRow label="Fill">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={(selected as StarElement).fill || "#fbbf24"}
+                          onChange={(e) => update({ fill: e.target.value } as Partial<StarElement>)}
+                          className="h-7 w-7 rounded border border-border cursor-pointer"
+                        />
+                        <Input
+                          className="h-7 text-xs flex-1"
+                          value={(selected as StarElement).fill}
+                          onChange={(e) => update({ fill: e.target.value } as Partial<StarElement>)}
+                        />
+                      </div>
+                    </PropertyRow>
+                  )}
+                  <PropertyRow label="Stroke">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={(selected as StarElement).stroke || "#000000"}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<StarElement>)}
+                        className="h-7 w-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        className="h-7 text-xs flex-1"
+                        value={(selected as StarElement).stroke}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<StarElement>)}
+                      />
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Points">
+                    <NumberInput
+                      value={(selected as StarElement).numPoints}
+                      onChange={(v) => update({ numPoints: Math.max(3, Math.round(v)) } as Partial<StarElement>)}
+                    />
+                  </PropertyRow>
+                  <PropertyRow label="Inner R">
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[((selected as StarElement).innerRadiusRatio ?? 0.4) * 100]}
+                        onValueChange={(v: number | readonly number[]) => {
+                          const val = typeof v === "number" ? v : v[0];
+                          update({ innerRadiusRatio: val / 100 } as Partial<StarElement>);
+                        }}
+                        min={10}
+                        max={90}
+                        step={1}
+                        className="flex-1 py-2"
+                      />
+                      <span className="text-[10px] text-muted-foreground w-8 text-right">
+                        {Math.round(((selected as StarElement).innerRadiusRatio ?? 0.4) * 100)}%
+                      </span>
+                    </div>
+                  </PropertyRow>
+                </div>
+              )}
+
+              {/* Icon Properties */}
+              {selected.type === "icon" && (
+                <div className="space-y-2">
+                  <SectionHeader>Icon</SectionHeader>
+                  <PropertyRow label="Fill">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={(selected as IconElement).fill || "#ffffff"}
+                        onChange={(e) => update({ fill: e.target.value } as Partial<IconElement>)}
+                        className="h-7 w-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        className="h-7 text-xs flex-1"
+                        value={(selected as IconElement).fill}
+                        onChange={(e) => update({ fill: e.target.value } as Partial<IconElement>)}
+                      />
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Stroke">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={(selected as IconElement).stroke || "#ffffff"}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<IconElement>)}
+                        className="h-7 w-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        className="h-7 text-xs flex-1"
+                        value={(selected as IconElement).stroke}
+                        onChange={(e) => update({ stroke: e.target.value } as Partial<IconElement>)}
+                      />
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Stroke W">
+                    <NumberInput
+                      value={(selected as IconElement).strokeWidth}
+                      onChange={(v) => update({ strokeWidth: v } as Partial<IconElement>)}
+                    />
+                  </PropertyRow>
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] text-muted-foreground">Choose Icon</span>
+                    {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
+                      <div key={category}>
+                        <span className="text-[9px] text-muted-foreground uppercase">{category}</span>
+                        <div className="grid grid-cols-6 gap-1 mt-1">
+                          {icons.map((name) => (
+                            <button
+                              key={name}
+                              className={`h-8 w-full rounded border text-[8px] truncate transition-all ${(selected as IconElement).iconName === name ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+                              title={name}
+                              onClick={() => update({ iconName: name } as Partial<IconElement>)}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Text stroke & gradient (for text elements) */}
+              {selected.type === "text" && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <SectionHeader>Text Effects</SectionHeader>
+                    <PropertyRow label="Stroke">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={(selected as TextElement).strokeColor || "#000000"}
+                          onChange={(e) => update({ strokeColor: e.target.value } as Partial<TextElement>)}
+                          className="h-7 w-7 rounded border border-border cursor-pointer"
+                        />
+                        <Input
+                          className="h-7 text-xs flex-1"
+                          value={(selected as TextElement).strokeColor || ""}
+                          placeholder="none"
+                          onChange={(e) => update({ strokeColor: e.target.value || undefined } as Partial<TextElement>)}
+                        />
+                      </div>
+                    </PropertyRow>
+                    <PropertyRow label="Stroke W">
+                      <NumberInput
+                        value={(selected as TextElement).strokeWidth || 0}
+                        onChange={(v) => update({ strokeWidth: v } as Partial<TextElement>)}
+                      />
+                    </PropertyRow>
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
+              {/* Blur Effect — all elements */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <SectionHeader>Blur</SectionHeader>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selected.blurEnabled ?? false}
+                      onChange={(e) => update({ blurEnabled: e.target.checked })}
+                      className="h-3 w-3 rounded border-border accent-primary"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      {selected.blurEnabled ? "On" : "Off"}
+                    </span>
+                  </label>
+                </div>
+                {selected.blurEnabled && (
+                  <PropertyRow label="Radius">
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[selected.blurRadius ?? 5]}
+                        onValueChange={(v: number | readonly number[]) => {
+                          const val = typeof v === "number" ? v : v[0];
+                          update({ blurRadius: val });
+                        }}
+                        min={0}
+                        max={50}
+                        step={1}
+                        className="flex-1 py-2"
+                      />
+                      <span className="text-[10px] text-muted-foreground w-6 text-right">{selected.blurRadius ?? 5}</span>
+                    </div>
+                  </PropertyRow>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Flip — all elements */}
+              <div className="space-y-2">
+                <SectionHeader>Flip</SectionHeader>
+                <div className="flex gap-1">
+                  <Button
+                    variant={selected.flipX ? "secondary" : "ghost"}
+                    size="sm"
+                    className="flex-1 h-8 text-xs gap-1"
+                    onClick={() => update({ flipX: !selected.flipX })}
+                  >
+                    <FlipHorizontal2 className="h-3.5 w-3.5" />
+                    Horizontal
+                  </Button>
+                  <Button
+                    variant={selected.flipY ? "secondary" : "ghost"}
+                    size="sm"
+                    className="flex-1 h-8 text-xs gap-1"
+                    onClick={() => update({ flipY: !selected.flipY })}
+                  >
+                    <FlipVertical2 className="h-3.5 w-3.5" />
+                    Vertical
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </div>

@@ -246,6 +246,114 @@ server.tool(
 );
 
 server.tool(
+  "add_circle",
+  "Add a circle/ellipse element to the current screen",
+  {
+    x: z.number().describe("X position"),
+    y: z.number().describe("Y position"),
+    width: z.number().describe("Width (horizontal diameter)"),
+    height: z.number().describe("Height (vertical diameter, same as width for perfect circle)"),
+    fill: z.string().optional().default("#8b5cf6").describe("Fill color (hex)"),
+    stroke: z.string().optional().default("").describe("Stroke color (hex, empty for none)"),
+    strokeWidth: z.number().optional().default(0).describe("Stroke width"),
+    gradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().describe("Gradient fill (overrides solid fill)"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+    rotation: z.number().optional().default(0).describe("Rotation in degrees"),
+    name: z.string().optional().default("Circle").describe("Layer name"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_circle", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
+  "add_line",
+  "Add a line or arrow element to the current screen",
+  {
+    x: z.number().describe("X position (start point)"),
+    y: z.number().describe("Y position (start point)"),
+    width: z.number().describe("Horizontal length"),
+    height: z.number().optional().default(0).describe("Vertical length (0 for horizontal line)"),
+    stroke: z.string().optional().default("#ffffff").describe("Line color (hex)"),
+    strokeWidth: z.number().optional().default(4).describe("Line thickness"),
+    lineStart: z.enum(["none", "arrow", "dot"]).optional().default("none").describe("Start point style"),
+    lineEnd: z.enum(["none", "arrow", "dot"]).optional().default("none").describe("End point style"),
+    dash: z.boolean().optional().default(false).describe("Whether the line is dashed"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+    rotation: z.number().optional().default(0).describe("Rotation in degrees"),
+    name: z.string().optional().default("Line").describe("Layer name"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_line", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
+  "add_star",
+  "Add a star element to the current screen",
+  {
+    x: z.number().describe("X position"),
+    y: z.number().describe("Y position"),
+    width: z.number().optional().default(200).describe("Size (width = height)"),
+    numPoints: z.number().optional().default(5).describe("Number of star points (3-20)"),
+    innerRadiusRatio: z.number().optional().default(0.4).describe("Inner radius ratio (0.1-0.9, lower = spikier)"),
+    fill: z.string().optional().default("#fbbf24").describe("Fill color (hex)"),
+    stroke: z.string().optional().default("").describe("Stroke color (hex, empty for none)"),
+    strokeWidth: z.number().optional().default(0).describe("Stroke width"),
+    gradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().describe("Gradient fill (overrides solid fill)"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+    rotation: z.number().optional().default(0).describe("Rotation in degrees"),
+    name: z.string().optional().default("Star").describe("Layer name"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_star", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
+  "add_icon",
+  "Add an SVG icon element to the current screen. Use get_icons to list available icon names.",
+  {
+    iconName: z.string().describe("Icon name (use get_icons to list available ones)"),
+    x: z.number().describe("X position"),
+    y: z.number().describe("Y position"),
+    width: z.number().optional().default(150).describe("Icon size (width)"),
+    height: z.number().optional().default(150).describe("Icon size (height)"),
+    fill: z.string().optional().default("#ffffff").describe("Icon fill color (hex)"),
+    stroke: z.string().optional().default("").describe("Icon stroke color (hex, empty for none)"),
+    strokeWidth: z.number().optional().default(0).describe("Icon stroke width"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+    rotation: z.number().optional().default(0).describe("Rotation in degrees"),
+    name: z.string().optional().describe("Layer name (defaults to icon name)"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_icon", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
+  "get_icons",
+  "List all available icon names organized by category",
+  {},
+  async () => {
+    const result = await sendCommand("get_icons");
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
   "add_device_frame",
   "Add a device frame (iPhone/iPad) to the current screen. Drop a screenshot inside it.",
   {
@@ -312,6 +420,24 @@ server.tool(
     // Device-frame-specific
     deviceId: z.string().optional().describe("Device ID (device-frame elements)"),
     screenshotSrc: z.string().optional().describe("Screenshot data URL (device-frame elements)"),
+    // Circle-specific (fill, stroke, strokeWidth shared with rectangle)
+    // Line-specific
+    lineStart: z.enum(["none", "arrow", "dot"]).optional().describe("Line start style (line elements)"),
+    lineEnd: z.enum(["none", "arrow", "dot"]).optional().describe("Line end style (line elements)"),
+    dash: z.boolean().optional().describe("Dashed line (line elements)"),
+    // Star-specific
+    numPoints: z.number().optional().describe("Number of star points (star elements)"),
+    innerRadiusRatio: z.number().optional().describe("Inner radius ratio 0.1-0.9 (star elements)"),
+    // Icon-specific
+    iconName: z.string().optional().describe("Icon name (icon elements)"),
+    // Effects — applicable to ALL element types
+    blurEnabled: z.boolean().optional().describe("Enable gaussian blur effect"),
+    blurRadius: z.number().optional().describe("Blur radius (0-50)"),
+    flipX: z.boolean().optional().describe("Flip element horizontally"),
+    flipY: z.boolean().optional().describe("Flip element vertically"),
+    // Text effects
+    strokeColor: z.string().optional().describe("Text stroke/outline color (text elements)"),
+    textStrokeWidth: z.number().optional().describe("Text stroke/outline width (text elements, maps to strokeWidth)"),
   },
   async (params) => {
     const result = await sendCommand("update_element", params);

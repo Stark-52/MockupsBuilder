@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useEditorStore } from "@/lib/store";
 import { getDevice, DEVICES } from "@/lib/devices";
 import { db } from "@/lib/db";
-import { exportStageToPNG, exportAllScreensAsZip, exportBannerSegments, exportAllLocales, downloadBlob } from "@/lib/export";
+import { exportStageToPNG, exportStageToJPEG, exportAllScreensAsZip, exportBannerSegments, exportAllLocales, downloadBlob } from "@/lib/export";
+import { ICON_NAMES, ICON_CATEGORIES, ICON_PATHS } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,8 +31,18 @@ import {
   Plus,
   ZoomIn,
   ZoomOut,
+  Circle,
+  Minus,
+  Star,
+  Grid3X3,
+  Magnet,
+  Maximize,
+  Link,
+  Smile,
 } from "lucide-react";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
   PopoverContent,
@@ -59,6 +70,10 @@ export function Toolbar({ onBack }: ToolbarProps) {
     redo,
     historyIndex,
     history,
+    gridEnabled,
+    setGridEnabled,
+    snapEnabled,
+    setSnapEnabled,
   } = useEditorStore();
 
   const canUndo = historyIndex > 0;
@@ -103,6 +118,50 @@ export function Toolbar({ onBack }: ToolbarProps) {
     input.click();
   };
 
+  const [imageUrl, setImageUrl] = useState("");
+  const [importingUrl, setImportingUrl] = useState(false);
+  const handleImportFromUrl = async () => {
+    if (!imageUrl.trim() || importingUrl) return;
+    setImportingUrl(true);
+    try {
+      const resp = await fetch(imageUrl.trim());
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = reader.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+          const screen = useEditorStore.getState().getActiveScreen();
+          const cw = screen?.canvasWidth ?? 1290;
+          const ch = screen?.canvasHeight ?? 2796;
+          const maxW = cw * 0.8;
+          const scale = Math.min(1, maxW / img.width);
+          addElement({
+            id: crypto.randomUUID(),
+            type: "image",
+            x: cw / 2 - (img.width * scale) / 2,
+            y: ch / 2 - (img.height * scale) / 2,
+            width: img.width * scale,
+            height: img.height * scale,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            name: "Imported Image",
+            src,
+          });
+          setImageUrl("");
+        };
+        img.src = src;
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      alert("Failed to load image from URL. Check that the URL is correct and publicly accessible.");
+    } finally {
+      setImportingUrl(false);
+    }
+  };
+
   const handleAddDeviceFrame = () => {
     const screen = useEditorStore.getState().getActiveScreen();
     const cw = screen?.canvasWidth ?? 1290;
@@ -125,6 +184,30 @@ export function Toolbar({ onBack }: ToolbarProps) {
       name: "Device Frame",
       deviceId: screen?.deviceTarget ?? "iphone-6.7",
       screenshotSrc: null,
+    });
+  };
+
+  const handleAddIcon = (iconName: string) => {
+    const screen = useEditorStore.getState().getActiveScreen();
+    const cw = screen?.canvasWidth ?? 1290;
+    const ch = screen?.canvasHeight ?? 2796;
+    const size = Math.min(cw, ch) * 0.12;
+    addElement({
+      id: crypto.randomUUID(),
+      type: "icon",
+      x: cw / 2 - size / 2,
+      y: ch / 2 - size / 2,
+      width: size,
+      height: size,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      name: iconName,
+      iconName,
+      fill: "#ffffff",
+      stroke: "",
+      strokeWidth: 0,
     });
   };
 
@@ -199,6 +282,17 @@ export function Toolbar({ onBack }: ToolbarProps) {
     downloadBlob(blob, `${project.name}.png`);
   };
 
+  const handleExportJPEG = async () => {
+    if (!project) return;
+    const stageNode = Konva.stages[0];
+    if (!stageNode) return;
+    const screen = useEditorStore.getState().getActiveScreen();
+    const w = screen?.canvasWidth ?? project.canvasWidth;
+    const h = screen?.canvasHeight ?? project.canvasHeight;
+    const blob = await exportStageToJPEG(stageNode, w, h, 0.92);
+    downloadBlob(blob, `${project.name}.jpg`);
+  };
+
   const [exporting, setExporting] = useState(false);
   const handleExportAll = async () => {
     if (!project || exporting) return;
@@ -233,6 +327,9 @@ export function Toolbar({ onBack }: ToolbarProps) {
     { id: "hand" as const, icon: Hand, label: "Hand (H)" },
     { id: "text" as const, icon: Type, label: "Text (T)" },
     { id: "rectangle" as const, icon: Square, label: "Rectangle (R)" },
+    { id: "circle" as const, icon: Circle, label: "Circle (O)" },
+    { id: "line" as const, icon: Minus, label: "Line (L)" },
+    { id: "star" as const, icon: Star, label: "Star (S)" },
   ];
 
   return (
@@ -274,6 +371,36 @@ export function Toolbar({ onBack }: ToolbarProps) {
         <ImagePlus className="h-4 w-4" />
       </Button>
 
+      <Popover>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+          title="Import Image from URL"
+        >
+          <Link className="h-4 w-4" />
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-2" align="start">
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Import from URL</p>
+          <div className="flex gap-1">
+            <Input
+              className="h-8 text-xs flex-1"
+              placeholder="https://example.com/image.png"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleImportFromUrl(); }}
+            />
+            <Button
+              variant="default"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={importingUrl || !imageUrl.trim()}
+              onClick={handleImportFromUrl}
+            >
+              {importingUrl ? "..." : "Add"}
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Button
         variant="ghost"
         size="icon"
@@ -282,6 +409,61 @@ export function Toolbar({ onBack }: ToolbarProps) {
         onClick={handleAddDeviceFrame}
       >
         <Smartphone className="h-4 w-4" />
+      </Button>
+
+      <Popover>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+          title="Add Icon"
+        >
+          <Smile className="h-4 w-4" />
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-2" align="start">
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Add Icon</p>
+          <ScrollArea className="h-52">
+            {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
+              <div key={category} className="mb-2">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">{category}</p>
+                <div className="grid grid-cols-8 gap-1">
+                  {icons.map((name) => (
+                    <button
+                      key={name}
+                      className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent cursor-pointer"
+                      title={name}
+                      onClick={() => handleAddIcon(name)}
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d={ICON_PATHS[name]} />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+
+      <div className="h-6 w-px bg-border mx-1" />
+
+      {/* Grid & Snap toggles */}
+      <Button
+        variant={gridEnabled ? "secondary" : "ghost"}
+        size="icon"
+        className="h-8 w-8"
+        title="Toggle Grid"
+        onClick={() => setGridEnabled(!gridEnabled)}
+      >
+        <Grid3X3 className="h-4 w-4" />
+      </Button>
+      <Button
+        variant={snapEnabled ? "secondary" : "ghost"}
+        size="icon"
+        className="h-8 w-8"
+        title="Toggle Snap Guides"
+        onClick={() => setSnapEnabled(!snapEnabled)}
+      >
+        <Magnet className="h-4 w-4" />
       </Button>
 
       <div className="h-6 w-px bg-border mx-1" />
@@ -467,6 +649,26 @@ export function Toolbar({ onBack }: ToolbarProps) {
         >
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          title="Zoom to Fit"
+          onClick={() => {
+            const containerEl = document.querySelector(".flex-1.overflow-hidden");
+            if (!containerEl) return;
+            const screen = useEditorStore.getState().getActiveScreen();
+            const cw = screen?.canvasWidth ?? project?.canvasWidth ?? 1290;
+            const ch = screen?.canvasHeight ?? project?.canvasHeight ?? 2796;
+            const { width: vw, height: vh } = containerEl.getBoundingClientRect();
+            const padding = 60;
+            const fitZoom = Math.min((vw - padding) / cw, (vh - padding) / ch);
+            setZoom(fitZoom);
+            useEditorStore.getState().setPan(0, 0);
+          }}
+        >
+          <Maximize className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       <div className="h-6 w-px bg-border mx-1" />
@@ -496,6 +698,8 @@ export function Toolbar({ onBack }: ToolbarProps) {
 
       <div className="h-6 w-px bg-border mx-1" />
 
+      <KeyboardShortcuts />
+
       <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={handleSave}>
         Save
       </Button>
@@ -514,9 +718,12 @@ export function Toolbar({ onBack }: ToolbarProps) {
         </Button>
       ) : (
         <>
-          <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen" onClick={handleExport}>
+          <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen as PNG" onClick={handleExport}>
             <Download className="h-3.5 w-3.5 mr-1" />
-            Export
+            PNG
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" title="Export current screen as JPEG" onClick={handleExportJPEG}>
+            JPG
           </Button>
           {(project?.screens?.length ?? 0) > 1 && (
             <Button

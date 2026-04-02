@@ -1,4 +1,4 @@
-export type ElementType = "text" | "image" | "rectangle" | "device-frame";
+export type ElementType = "text" | "image" | "rectangle" | "device-frame" | "circle" | "line" | "star" | "icon";
 
 export interface GradientStop {
   offset: number;
@@ -30,6 +30,12 @@ export interface BaseElement {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  // Blur
+  blurEnabled?: boolean;
+  blurRadius?: number;
+  // Flip
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 export interface TextElement extends BaseElement {
@@ -43,6 +49,11 @@ export interface TextElement extends BaseElement {
   align: "left" | "center" | "right";
   lineHeight: number;
   autoFit?: boolean;
+  /** Text stroke/outline */
+  strokeColor?: string;
+  strokeWidth?: number;
+  /** Gradient fill for text */
+  gradientFill?: GradientConfig;
   /** Translations keyed by locale code. Fallback: `text` field. */
   translations?: Record<string, string>;
 }
@@ -68,11 +79,56 @@ export interface DeviceFrameElement extends BaseElement {
   screenshotSrc: string | null;
 }
 
+export interface CircleElement extends BaseElement {
+  type: "circle";
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  gradient?: GradientConfig;
+}
+
+export interface LineElement extends BaseElement {
+  type: "line";
+  stroke: string;
+  strokeWidth: number;
+  /** Line end style */
+  lineEnd: "none" | "arrow" | "dot";
+  /** Line start style */
+  lineStart: "none" | "arrow" | "dot";
+  /** Dashed line */
+  dash?: number[];
+}
+
+export interface StarElement extends BaseElement {
+  type: "star";
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  /** Number of outer points */
+  numPoints: number;
+  /** Inner radius ratio (0–1, relative to outer radius) */
+  innerRadiusRatio: number;
+  gradient?: GradientConfig;
+}
+
+export interface IconElement extends BaseElement {
+  type: "icon";
+  /** SVG path data or lucide icon name */
+  iconName: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+}
+
 export type CanvasElement =
   | TextElement
   | ImageElement
   | RectangleElement
-  | DeviceFrameElement;
+  | DeviceFrameElement
+  | CircleElement
+  | LineElement
+  | StarElement
+  | IconElement;
 
 export interface Screen {
   id: string;
@@ -130,7 +186,21 @@ export type CanvasElementWithoutId =
   | Omit<TextElement, "id">
   | Omit<ImageElement, "id">
   | Omit<RectangleElement, "id">
-  | Omit<DeviceFrameElement, "id">;
+  | Omit<DeviceFrameElement, "id">
+  | Omit<CircleElement, "id">
+  | Omit<LineElement, "id">
+  | Omit<StarElement, "id">
+  | Omit<IconElement, "id">;
+
+export type ExportFormat = "png" | "jpeg";
+
+export interface ExportPreset {
+  id: string;
+  name: string;
+  format: ExportFormat;
+  quality: number; // 0–1, relevant for jpeg
+  screens: "all" | "current" | number[];
+}
 
 export interface Template {
   id: string;

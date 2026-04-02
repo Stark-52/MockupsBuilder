@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Copy, FolderOpen } from "lucide-react";
+import { Plus, Trash2, Copy, FolderOpen, MonitorSmartphone } from "lucide-react";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -74,6 +74,42 @@ export default function Dashboard() {
     };
     await db.projects.add(dup);
     setProjects((prev) => [dup, ...prev]);
+  };
+
+  const duplicateAcrossDevices = async (project: Project) => {
+    const otherDevices = DEVICES.filter((d) => d.id !== project.deviceTarget);
+    const newProjects: Project[] = [];
+    for (const device of otherDevices) {
+      const scaleX = device.width / (project.canvasWidth || 1290);
+      const scaleY = device.height / (project.canvasHeight || 2796);
+      const dup: Project = {
+        ...JSON.parse(JSON.stringify(project)),
+        id: crypto.randomUUID(),
+        name: `${project.name} (${device.name})`,
+        deviceTarget: device.id,
+        canvasWidth: device.width,
+        canvasHeight: device.height,
+        screens: project.screens.map((s) => ({
+          ...s,
+          id: crypto.randomUUID(),
+          deviceTarget: device.id,
+          canvasWidth: device.width,
+          canvasHeight: device.height,
+          elements: s.elements.map((el) => ({
+            ...el,
+            x: Math.round(el.x * scaleX),
+            y: Math.round(el.y * scaleY),
+            width: Math.round(el.width * scaleX),
+            height: Math.round(el.height * scaleY),
+          })),
+        })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await db.projects.add(dup);
+      newProjects.push(dup);
+    }
+    setProjects((prev) => [...newProjects, ...prev]);
   };
 
   const deleteProject = async (id: string) => {
@@ -194,6 +230,18 @@ export default function Dashboard() {
                       }}
                     >
                       <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Duplicate across all devices"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateAcrossDevices(project);
+                      }}
+                    >
+                      <MonitorSmartphone className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="destructive"

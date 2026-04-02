@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer, Line } from "react-konva";
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer, Line, Star, Arrow, Ellipse, Path } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "@/lib/store";
 import { getDevice } from "@/lib/devices";
-import { CanvasElement, DeviceFrameElement, GradientConfig, RectangleElement, TextElement } from "@/lib/types";
+import { CanvasElement, DeviceFrameElement, GradientConfig, RectangleElement, TextElement, CircleElement, LineElement, StarElement, IconElement } from "@/lib/types";
+import { ICON_PATHS } from "@/lib/icons";
 
 // Track drag start position for shift-lock axis constraint
 const dragState: { startX: number; startY: number; axis: "x" | "y" | null; duplicated: boolean } = {
@@ -278,6 +279,76 @@ function getShadowProps(el: CanvasElement) {
     shadowEnabled: true,
     shadowForStrokeEnabled: false,
   };
+}
+
+function getBlurFilter(el: CanvasElement) {
+  if (!el.blurEnabled || !el.blurRadius) return [];
+  return [Konva.Filters.Blur];
+}
+
+function getFlipProps(el: CanvasElement): { scaleX?: number; scaleY?: number; offsetX?: number; offsetY?: number } {
+  const props: { scaleX?: number; scaleY?: number; offsetX?: number; offsetY?: number } = {};
+  if (el.flipX) {
+    props.scaleX = -1;
+    props.offsetX = el.width;
+  }
+  if (el.flipY) {
+    props.scaleY = -1;
+    props.offsetY = el.height;
+  }
+  return props;
+}
+
+/** Snap guide calculation */
+function calculateSnapGuides(
+  dragEl: CanvasElement,
+  allElements: CanvasElement[],
+  canvasW: number,
+  canvasH: number,
+  threshold: number = 5,
+): { x: number[]; y: number[]; snapX?: number; snapY?: number } {
+  const guides: { x: number[]; y: number[] } = { x: [], y: [] };
+  let snapX: number | undefined;
+  let snapY: number | undefined;
+
+  // Target positions (edges + center)
+  const dragCX = dragEl.x + dragEl.width / 2;
+  const dragCY = dragEl.y + dragEl.height / 2;
+  const dragR = dragEl.x + dragEl.width;
+  const dragB = dragEl.y + dragEl.height;
+
+  // Canvas center + edges
+  const refPointsX = [0, canvasW / 2, canvasW];
+  const refPointsY = [0, canvasH / 2, canvasH];
+
+  // Other elements
+  for (const el of allElements) {
+    if (el.id === dragEl.id) continue;
+    refPointsX.push(el.x, el.x + el.width / 2, el.x + el.width);
+    refPointsY.push(el.y, el.y + el.height / 2, el.y + el.height);
+  }
+
+  // Check X snap
+  for (const dragPoint of [dragEl.x, dragCX, dragR]) {
+    for (const refPoint of refPointsX) {
+      if (Math.abs(dragPoint - refPoint) < threshold) {
+        guides.x.push(refPoint);
+        if (snapX === undefined) snapX = refPoint - (dragPoint - dragEl.x);
+      }
+    }
+  }
+
+  // Check Y snap
+  for (const dragPoint of [dragEl.y, dragCY, dragB]) {
+    for (const refPoint of refPointsY) {
+      if (Math.abs(dragPoint - refPoint) < threshold) {
+        guides.y.push(refPoint);
+        if (snapY === undefined) snapY = refPoint - (dragPoint - dragEl.y);
+      }
+    }
+  }
+
+  return { ...guides, snapX, snapY };
 }
 
 function ImageNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
@@ -623,7 +694,345 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   );
 }
 
-function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool, activeLocale }: {
+/* ──────── Circle Node ──────── */
+function CircleNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+  el: CircleElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (updates: Partial<CanvasElement>) => void;
+  canvasW: number;
+  canvasH: number;
+  activeTool: string;
+}) {
+  const shapeRef = useRef<Konva.Ellipse>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && shapeRef.current) {
+      trRef.current.nodes([shapeRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  const radiusX = el.width / 2;
+  const radiusY = el.height / 2;
+
+  return (
+    <>
+      <Ellipse
+        ref={shapeRef}
+        x={el.x + radiusX}
+        y={el.y + radiusY}
+        radiusX={radiusX}
+        radiusY={radiusY}
+        rotation={el.rotation}
+        opacity={el.opacity}
+        fill={el.gradient ? undefined : el.fill}
+        {...getGradientProps(el.gradient, el.width, el.height)}
+        stroke={el.stroke}
+        strokeWidth={el.strokeWidth}
+        draggable={!el.locked && activeTool === "select"}
+        listening={activeTool === "select"}
+        visible={el.visible}
+        {...getShadowProps(el)}
+        onClick={onSelect}
+        onTap={onSelect}
+        onDragStart={(e) => handleDragStart(e, el)}
+        onDragMove={handleDragMove}
+        onDragEnd={(e) => {
+          onChange({ x: e.target.x() - radiusX, y: e.target.y() - radiusY });
+        }}
+        onTransformEnd={() => {
+          const node = shapeRef.current;
+          if (!node) return;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          const newRadiusX = node.radiusX() * scaleX;
+          const newRadiusY = node.radiusY() * scaleY;
+          onChange({
+            x: node.x() - newRadiusX,
+            y: node.y() - newRadiusY,
+            width: newRadiusX * 2,
+            height: newRadiusY * 2,
+            rotation: node.rotation(),
+          });
+        }}
+      />
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+          boundBoxFunc={(_, newBox) => ({
+            ...newBox,
+            width: Math.max(10, newBox.width),
+            height: Math.max(10, newBox.height),
+          })}
+        />
+      )}
+    </>
+  );
+}
+
+/* ──────── Line / Arrow Node ──────── */
+function LineNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+  el: LineElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (updates: Partial<CanvasElement>) => void;
+  canvasW: number;
+  canvasH: number;
+  activeTool: string;
+}) {
+  const shapeRef = useRef<Konva.Arrow | Konva.Line>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && shapeRef.current) {
+      trRef.current.nodes([shapeRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  const points = [0, 0, el.width, el.height];
+  const hasArrowEnd = el.lineEnd === "arrow";
+  const hasArrowStart = el.lineStart === "arrow";
+  const pointerLength = Math.max(10, el.strokeWidth * 3);
+  const pointerWidth = Math.max(10, el.strokeWidth * 3);
+
+  const LineComponent = (hasArrowEnd || hasArrowStart) ? Arrow : Line;
+
+  return (
+    <>
+      <LineComponent
+        ref={shapeRef as React.RefObject<never>}
+        x={el.x}
+        y={el.y}
+        points={points}
+        stroke={el.stroke}
+        strokeWidth={el.strokeWidth}
+        dash={el.dash}
+        opacity={el.opacity}
+        rotation={el.rotation}
+        draggable={!el.locked && activeTool === "select"}
+        listening={activeTool === "select"}
+        visible={el.visible}
+        hitStrokeWidth={Math.max(20, el.strokeWidth * 3)}
+        {...getShadowProps(el)}
+        {...(hasArrowEnd ? { pointerLength, pointerWidth } : {})}
+        {...(hasArrowStart ? { pointerAtBeginning: true } : {})}
+        onClick={onSelect}
+        onTap={onSelect}
+        onDragStart={(e) => handleDragStart(e, el)}
+        onDragMove={handleDragMove}
+        onDragEnd={(e) => {
+          onChange({ x: e.target.x(), y: e.target.y() });
+        }}
+        onTransformEnd={() => {
+          const node = shapeRef.current;
+          if (!node) return;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            x: node.x(),
+            y: node.y(),
+            width: el.width * scaleX,
+            height: el.height * scaleY,
+            rotation: node.rotation(),
+          });
+        }}
+      />
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+        />
+      )}
+    </>
+  );
+}
+
+/* ──────── Star Node ──────── */
+function StarNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+  el: StarElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (updates: Partial<CanvasElement>) => void;
+  canvasW: number;
+  canvasH: number;
+  activeTool: string;
+}) {
+  const shapeRef = useRef<Konva.Star>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && shapeRef.current) {
+      trRef.current.nodes([shapeRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  const outerRadius = Math.min(el.width, el.height) / 2;
+  const innerRadius = outerRadius * (el.innerRadiusRatio || 0.4);
+
+  return (
+    <>
+      <Star
+        ref={shapeRef}
+        x={el.x + el.width / 2}
+        y={el.y + el.height / 2}
+        numPoints={el.numPoints}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
+        fill={el.gradient ? undefined : el.fill}
+        {...getGradientProps(el.gradient, el.width, el.height)}
+        stroke={el.stroke}
+        strokeWidth={el.strokeWidth}
+        rotation={el.rotation}
+        opacity={el.opacity}
+        draggable={!el.locked && activeTool === "select"}
+        listening={activeTool === "select"}
+        visible={el.visible}
+        {...getShadowProps(el)}
+        onClick={onSelect}
+        onTap={onSelect}
+        onDragStart={(e) => handleDragStart(e, el)}
+        onDragMove={handleDragMove}
+        onDragEnd={(e) => {
+          onChange({ x: e.target.x() - el.width / 2, y: e.target.y() - el.height / 2 });
+        }}
+        onTransformEnd={() => {
+          const node = shapeRef.current;
+          if (!node) return;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          const size = Math.max(10, outerRadius * 2 * Math.max(scaleX, scaleY));
+          onChange({
+            x: node.x() - size / 2,
+            y: node.y() - size / 2,
+            width: size,
+            height: size,
+            rotation: node.rotation(),
+          });
+        }}
+      />
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+          boundBoxFunc={(_, newBox) => ({
+            ...newBox,
+            width: Math.max(10, newBox.width),
+            height: Math.max(10, newBox.height),
+          })}
+        />
+      )}
+    </>
+  );
+}
+
+/* ──────── Icon Node (SVG path rendered as Konva.Path) ──────── */
+function IconNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+  el: IconElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (updates: Partial<CanvasElement>) => void;
+  canvasW: number;
+  canvasH: number;
+  activeTool: string;
+}) {
+  const groupRef = useRef<Konva.Group>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && groupRef.current) {
+      trRef.current.nodes([groupRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  const pathData = ICON_PATHS[el.iconName] || ICON_PATHS["star"] || "";
+  // Icons are 24×24 viewBox, scale to element size
+  const scaleX = el.width / 24;
+  const scaleY = el.height / 24;
+
+  return (
+    <>
+      <Group
+        ref={groupRef}
+        x={el.x}
+        y={el.y}
+        width={el.width}
+        height={el.height}
+        rotation={el.rotation}
+        opacity={el.opacity}
+        draggable={!el.locked && activeTool === "select"}
+        listening={activeTool === "select"}
+        visible={el.visible}
+        {...getShadowProps(el)}
+        onClick={onSelect}
+        onTap={onSelect}
+        onDragStart={(e) => handleDragStart(e, el)}
+        onDragMove={handleDragMove}
+        onDragEnd={(e) => {
+          onChange({ x: e.target.x(), y: e.target.y() });
+        }}
+        onTransformEnd={() => {
+          const node = groupRef.current;
+          if (!node) return;
+          const sx = node.scaleX();
+          const sy = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            x: node.x(),
+            y: node.y(),
+            width: Math.max(10, el.width * sx),
+            height: Math.max(10, el.height * sy),
+            rotation: node.rotation(),
+          });
+        }}
+      >
+        {/* Invisible rect for hit area */}
+        <Rect x={0} y={0} width={el.width} height={el.height} fill="transparent" />
+        {pathData.split("M").filter(Boolean).map((seg: string, i: number) => (
+          <Path
+            key={i}
+            data={"M" + seg}
+            fill={el.fill || undefined}
+            stroke={el.stroke || undefined}
+            strokeWidth={(el.strokeWidth || 2) / Math.max(scaleX, scaleY)}
+            scaleX={scaleX}
+            scaleY={scaleY}
+            listening={false}
+          />
+        ))}
+      </Group>
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+          boundBoxFunc={(_, newBox) => ({
+            ...newBox,
+            width: Math.max(10, newBox.width),
+            height: Math.max(10, newBox.height),
+          })}
+        />
+      )}
+    </>
+  );
+}
+
+function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool, activeLocale, onDragMoveSnap }: {
   el: CanvasElement;
   isSelected: boolean;
   onSelect: () => void;
@@ -632,6 +1041,7 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   canvasH: number;
   activeTool: string;
   activeLocale: string | null;
+  onDragMoveSnap?: (dragEl: CanvasElement) => { snapX?: number; snapY?: number };
 }) {
   const shapeRef = useRef<Konva.Shape>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -653,12 +1063,23 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
     draggable: !el.locked && activeTool === "select",
     listening: activeTool === "select",
     ...getShadowProps(el),
+    ...getFlipProps(el),
+    ...(getBlurFilter(el).length > 0 ? { filters: getBlurFilter(el), blurRadius: el.blurRadius || 0 } : {}),
     visible: el.visible,
     onClick: onSelect,
     onTap: onSelect,
     dragBoundFunc: makeDragBound(el, canvasW, canvasH),
     onDragStart: (e: Konva.KonvaEventObject<DragEvent>) => handleDragStart(e, el),
-    onDragMove: handleDragMove,
+    onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => {
+      handleDragMove(e);
+      if (onDragMoveSnap) {
+        const node = e.target;
+        const dragEl = { ...el, x: node.x(), y: node.y() };
+        const result = onDragMoveSnap(dragEl);
+        if (result.snapX !== undefined) node.x(result.snapX);
+        if (result.snapY !== undefined) node.y(result.snapY);
+      }
+    },
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
       onChange({ x: e.target.x(), y: e.target.y() });
     },
@@ -700,18 +1121,21 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
 
   if (el.type === "text") {
     const displayText = (activeLocale && el.translations?.[activeLocale]) || el.text;
+    const computedFontSize = el.autoFit
+      ? calculateAutoFitFontSize(displayText, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight)
+      : el.fontSize;
     return (
       <>
         <Text
           ref={shapeRef as React.RefObject<Konva.Text>}
           {...commonProps}
           text={displayText}
-          fontSize={el.autoFit
-            ? calculateAutoFitFontSize(displayText, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight)
-            : el.fontSize}
+          fontSize={computedFontSize}
           fontFamily={el.fontFamily}
           fontStyle={getKonvaFontStyle(el.fontWeight, el.fontStyle)}
           fill={el.fill}
+          stroke={el.strokeColor || undefined}
+          strokeWidth={el.strokeWidth || 0}
           align={el.align}
           lineHeight={el.lineHeight}
           wrap="word"
@@ -748,6 +1172,30 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
     );
   }
 
+  if (el.type === "circle") {
+    return (
+      <CircleNode el={el} isSelected={isSelected} onSelect={onSelect} onChange={onChange} canvasW={canvasW} canvasH={canvasH} activeTool={activeTool} />
+    );
+  }
+
+  if (el.type === "line") {
+    return (
+      <LineNode el={el} isSelected={isSelected} onSelect={onSelect} onChange={onChange} canvasW={canvasW} canvasH={canvasH} activeTool={activeTool} />
+    );
+  }
+
+  if (el.type === "star") {
+    return (
+      <StarNode el={el} isSelected={isSelected} onSelect={onSelect} onChange={onChange} canvasW={canvasW} canvasH={canvasH} activeTool={activeTool} />
+    );
+  }
+
+  if (el.type === "icon") {
+    return (
+      <IconNode el={el} isSelected={isSelected} onSelect={onSelect} onChange={onChange} canvasW={canvasW} canvasH={canvasH} activeTool={activeTool} />
+    );
+  }
+
   return null;
 }
 
@@ -756,12 +1204,15 @@ export function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
 
-  // Drag-to-create state for text/rectangle tools
+  // Drag-to-create state for text/rectangle/circle/line/star tools
   const [drawingRect, setDrawingRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const drawStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Shift key tracking for multi-select
   const shiftHeldRef = useRef(false);
+
+  // Space key tracking for panning
+  const spaceHeldRef = useRef(false);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<CanvasElement[]>([]);
@@ -777,11 +1228,19 @@ export function Canvas() {
     pushHistory,
     zoom,
     setZoom,
+    panX,
+    panY,
+    setPan,
     activeTool,
     setActiveTool,
     addElement,
     getActiveScreen,
     activeLocale,
+    snapEnabled,
+    setSnapGuides,
+    snapGuides,
+    gridEnabled,
+    gridSize,
   } = useEditorStore();
 
   const screen = getActiveScreen();
@@ -802,8 +1261,17 @@ export function Canvas() {
 
   // Shift key tracking
   useEffect(() => {
-    const down = (e: KeyboardEvent) => { if (e.key === "Shift") shiftHeldRef.current = true; };
-    const up = (e: KeyboardEvent) => { if (e.key === "Shift") shiftHeldRef.current = false; };
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Shift") shiftHeldRef.current = true;
+      if (e.code === "Space" && !(e.target as HTMLElement)?.matches("input, textarea")) {
+        e.preventDefault();
+        spaceHeldRef.current = true;
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === "Shift") shiftHeldRef.current = false;
+      if (e.code === "Space") spaceHeldRef.current = false;
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
@@ -880,6 +1348,9 @@ export function Canvas() {
         if (e.key === "h") useEditorStore.getState().setActiveTool("hand");
         if (e.key === "t") useEditorStore.getState().setActiveTool("text");
         if (e.key === "r") useEditorStore.getState().setActiveTool("rectangle");
+        if (e.key === "o" || e.key === "c") useEditorStore.getState().setActiveTool("circle");
+        if (e.key === "l") useEditorStore.getState().setActiveTool("line");
+        if (e.key === "s") useEditorStore.getState().setActiveTool("star");
         if (e.key === "Escape") useEditorStore.getState().clearSelection();
         // Arrow key nudge (1px, 10px with shift)
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
@@ -901,15 +1372,21 @@ export function Canvas() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Wheel zoom
+  // Wheel: pinch/ctrl+scroll = zoom, regular scroll = pan
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
       e.evt.preventDefault();
-      const scaleBy = 1.05;
-      const newZoom = e.evt.deltaY < 0 ? zoom * scaleBy : zoom / scaleBy;
-      setZoom(newZoom);
+      if (e.evt.ctrlKey || e.evt.metaKey) {
+        // Zoom (pinch gesture or ctrl+scroll)
+        const scaleBy = 1.05;
+        const newZoom = e.evt.deltaY < 0 ? zoom * scaleBy : zoom / scaleBy;
+        setZoom(newZoom);
+      } else {
+        // Pan
+        setPan(panX - e.evt.deltaX, panY - e.evt.deltaY);
+      }
     },
-    [zoom, setZoom]
+    [zoom, setZoom, panX, panY, setPan]
   );
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -923,7 +1400,7 @@ export function Canvas() {
   };
 
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "text" && activeTool !== "rectangle") return;
+    if (activeTool !== "text" && activeTool !== "rectangle" && activeTool !== "circle" && activeTool !== "line" && activeTool !== "star") return;
     const isCanvas = e.target === e.target.getStage() || e.target.attrs?.id === "canvas-bg";
     if (!isCanvas) return;
 
@@ -1003,6 +1480,62 @@ export function Canvas() {
         strokeWidth: 0,
         cornerRadius: 0,
       });
+    } else if (activeTool === "circle") {
+      const size = didDrag ? Math.max(rect.w, rect.h) : 200;
+      addElement({
+        id: newId,
+        type: "circle",
+        x: rect.x,
+        y: rect.y,
+        width: didDrag ? rect.w : size,
+        height: didDrag ? rect.h : size,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        name: "Circle",
+        fill: "#8b5cf6",
+        stroke: "",
+        strokeWidth: 0,
+      });
+    } else if (activeTool === "line") {
+      addElement({
+        id: newId,
+        type: "line",
+        x: rect.x,
+        y: rect.y,
+        width: didDrag ? rect.w : 300,
+        height: didDrag ? rect.h : 0,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        name: "Line",
+        stroke: "#ffffff",
+        strokeWidth: 4,
+        lineEnd: "none",
+        lineStart: "none",
+      });
+    } else if (activeTool === "star") {
+      const size = didDrag ? Math.max(rect.w, rect.h) : 200;
+      addElement({
+        id: newId,
+        type: "star",
+        x: rect.x,
+        y: rect.y,
+        width: size,
+        height: size,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        name: "Star",
+        fill: "#fbbf24",
+        stroke: "",
+        strokeWidth: 0,
+        numPoints: 5,
+        innerRadiusRatio: 0.4,
+      });
     }
 
     // Switch back to select tool and select the new element
@@ -1010,9 +1543,9 @@ export function Canvas() {
     setSelectedIds([newId]);
   };
 
-  // Offset to center the canvas
-  const offsetX = (stageSize.width - canvasW * zoom) / 2;
-  const offsetY = (stageSize.height - canvasH * zoom) / 2;
+  // Offset to center the canvas + pan
+  const offsetX = (stageSize.width - canvasW * zoom) / 2 + panX;
+  const offsetY = (stageSize.height - canvasH * zoom) / 2 + panY;
 
   // Drag & drop images onto canvas
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -1074,7 +1607,7 @@ export function Canvas() {
     <div
       ref={containerRef}
       className="flex-1 overflow-hidden bg-muted/50"
-      style={{ cursor: activeTool === "hand" ? "grab" : activeTool === "text" || activeTool === "rectangle" ? "crosshair" : "default" }}
+      style={{ cursor: (activeTool === "hand" || spaceHeldRef.current) ? "grab" : (activeTool === "text" || activeTool === "rectangle" || activeTool === "circle" || activeTool === "line" || activeTool === "star") ? "crosshair" : "default" }}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
     >
@@ -1093,7 +1626,18 @@ export function Canvas() {
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
         onDblClick={handleStageDblClick}
-        draggable={activeTool === "hand"}
+        draggable={activeTool === "hand" || spaceHeldRef.current}
+        onDragEnd={(e) => {
+          // Sync pan state from Stage position after hand-tool drag
+          const stage = e.target;
+          if (stage === stageRef.current) {
+            const newX = stage.x();
+            const newY = stage.y();
+            const baseX = (stageSize.width - canvasW * zoom) / 2;
+            const baseY = (stageSize.height - canvasH * zoom) / 2;
+            setPan(newX - baseX, newY - baseY);
+          }
+        }}
       >
         <Layer>
           {/* Canvas Background */}
@@ -1136,7 +1680,16 @@ export function Canvas() {
               onChange={(updates) => {
                 pushHistory();
                 updateElement(el.id, updates);
+                // Clear snap guides on drop
+                if (snapEnabled && (updates.x !== undefined || updates.y !== undefined)) {
+                  setSnapGuides({ x: [], y: [] });
+                }
               }}
+              onDragMoveSnap={snapEnabled ? (dragEl: CanvasElement) => {
+                const result = calculateSnapGuides(dragEl, elements, canvasW, canvasH);
+                setSnapGuides({ x: result.x, y: result.y });
+                return { snapX: result.snapX, snapY: result.snapY };
+              } : undefined}
             />
           ))}
 
@@ -1202,6 +1755,65 @@ export function Canvas() {
             </Group>
           )}
 
+          {/* Grid overlay */}
+          {gridEnabled && (
+            <Group name="overlays" listening={false} opacity={0.15}>
+              {Array.from({ length: Math.floor(canvasW / gridSize) }, (_, i) => (
+                <Line
+                  key={`gx-${i}`}
+                  points={[(i + 1) * gridSize, 0, (i + 1) * gridSize, canvasH]}
+                  stroke="#888888"
+                  strokeWidth={1 / zoom}
+                />
+              ))}
+              {Array.from({ length: Math.floor(canvasH / gridSize) }, (_, i) => (
+                <Line
+                  key={`gy-${i}`}
+                  points={[0, (i + 1) * gridSize, canvasW, (i + 1) * gridSize]}
+                  stroke="#888888"
+                  strokeWidth={1 / zoom}
+                />
+              ))}
+              {/* Canvas center guides */}
+              <Line
+                points={[canvasW / 2, 0, canvasW / 2, canvasH]}
+                stroke="#3b82f6"
+                strokeWidth={1 / zoom}
+                dash={[8 / zoom, 4 / zoom]}
+              />
+              <Line
+                points={[0, canvasH / 2, canvasW, canvasH / 2]}
+                stroke="#3b82f6"
+                strokeWidth={1 / zoom}
+                dash={[8 / zoom, 4 / zoom]}
+              />
+            </Group>
+          )}
+
+          {/* Snap guide lines */}
+          {snapEnabled && (snapGuides.x.length > 0 || snapGuides.y.length > 0) && (
+            <Group name="overlays" listening={false}>
+              {[...new Set(snapGuides.x)].map((x, i) => (
+                <Line
+                  key={`snap-x-${i}`}
+                  points={[x, 0, x, canvasH]}
+                  stroke="#f43f5e"
+                  strokeWidth={1 / zoom}
+                  dash={[6 / zoom, 3 / zoom]}
+                />
+              ))}
+              {[...new Set(snapGuides.y)].map((y, i) => (
+                <Line
+                  key={`snap-y-${i}`}
+                  points={[0, y, canvasW, y]}
+                  stroke="#f43f5e"
+                  strokeWidth={1 / zoom}
+                  dash={[6 / zoom, 3 / zoom]}
+                />
+              ))}
+            </Group>
+          )}
+
           {/* Drag-to-create preview */}
           {drawingRect && drawingRect.w > 2 && drawingRect.h > 2 && (
             <Rect
@@ -1209,8 +1821,8 @@ export function Canvas() {
               y={drawingRect.y}
               width={drawingRect.w}
               height={drawingRect.h}
-              fill={activeTool === "rectangle" ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.15)"}
-              stroke={activeTool === "rectangle" ? "#3b82f6" : "#ffffff"}
+              fill={activeTool === "rectangle" || activeTool === "circle" ? "rgba(59,130,246,0.3)" : activeTool === "star" ? "rgba(251,191,36,0.3)" : "rgba(255,255,255,0.15)"}
+              stroke={activeTool === "rectangle" || activeTool === "circle" ? "#3b82f6" : activeTool === "star" ? "#fbbf24" : "#ffffff"}
               strokeWidth={2 / zoom}
               dash={[8 / zoom, 4 / zoom]}
               listening={false}

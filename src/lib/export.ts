@@ -214,3 +214,49 @@ export function downloadBlob(blob: Blob, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export async function exportStageToJPEG(
+  stage: Konva.Stage,
+  width: number,
+  height: number,
+  quality: number = 0.92,
+): Promise<Blob> {
+  hideOverlays(stage);
+
+  const prevScaleX = stage.scaleX();
+  const prevScaleY = stage.scaleY();
+  const prevX = stage.x();
+  const prevY = stage.y();
+  const prevWidth = stage.width();
+  const prevHeight = stage.height();
+
+  stage.scaleX(1);
+  stage.scaleY(1);
+  stage.x(0);
+  stage.y(0);
+  stage.width(width);
+  stage.height(height);
+  stage.draw();
+
+  const dataURL = stage.toDataURL({
+    x: 0,
+    y: 0,
+    width,
+    height,
+    pixelRatio: 1,
+    mimeType: "image/jpeg",
+    quality,
+  });
+
+  showOverlays(stage);
+  stage.scaleX(prevScaleX);
+  stage.scaleY(prevScaleY);
+  stage.x(prevX);
+  stage.y(prevY);
+  stage.width(prevWidth);
+  stage.height(prevHeight);
+  stage.draw();
+
+  const res = await fetch(dataURL);
+  return res.blob();
+}

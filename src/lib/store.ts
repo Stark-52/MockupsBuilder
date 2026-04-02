@@ -36,6 +36,9 @@ interface EditorState {
   // Canvas
   zoom: number;
   setZoom: (zoom: number) => void;
+  panX: number;
+  panY: number;
+  setPan: (x: number, y: number) => void;
   backgroundColor: string;
   setBackgroundColor: (color: string) => void;
   backgroundGradient: GradientConfig | null;
@@ -49,12 +52,24 @@ interface EditorState {
   redo: () => void;
 
   // Tool
-  activeTool: "select" | "text" | "rectangle" | "hand";
-  setActiveTool: (tool: "select" | "text" | "rectangle" | "hand") => void;
+  activeTool: "select" | "text" | "rectangle" | "hand" | "circle" | "line" | "star";
+  setActiveTool: (tool: "select" | "text" | "rectangle" | "hand" | "circle" | "line" | "star") => void;
 
   // Locale
   activeLocale: string | null;
   setActiveLocale: (locale: string | null) => void;
+
+  // Smart Guides / Snap
+  snapEnabled: boolean;
+  setSnapEnabled: (enabled: boolean) => void;
+  snapGuides: { x: number[]; y: number[] };
+  setSnapGuides: (guides: { x: number[]; y: number[] }) => void;
+
+  // Grid
+  gridEnabled: boolean;
+  setGridEnabled: (enabled: boolean) => void;
+  gridSize: number;
+  setGridSize: (size: number) => void;
 
   // Internal: sync current elements back to project.screens
   _syncToProject: () => void;
@@ -256,6 +271,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Canvas
   zoom: 0.3,
   setZoom: (zoom) => set({ zoom: Math.max(0.05, Math.min(3, zoom)) }),
+  panX: 0,
+  panY: 0,
+  setPan: (x, y) => set({ panX: x, panY: y }),
   backgroundColor: "#1a1a2e",
   setBackgroundColor: (color) => set({ backgroundColor: color }),
   backgroundGradient: null,
@@ -297,6 +315,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   activeLocale: null,
   setActiveLocale: (locale) => set({ activeLocale: locale }),
+
+  // Smart Guides / Snap
+  snapEnabled: true,
+  setSnapEnabled: (enabled) => set({ snapEnabled: enabled }),
+  snapGuides: { x: [], y: [] },
+  setSnapGuides: (guides) => set({ snapGuides: guides }),
+
+  // Grid
+  gridEnabled: false,
+  setGridEnabled: (enabled) => set({ gridEnabled: enabled }),
+  gridSize: 50,
+  setGridSize: (size) => set({ gridSize: size }),
 
   // Internal: write current elements/backgroundColor back to project.screens
   _syncToProject: () => {
