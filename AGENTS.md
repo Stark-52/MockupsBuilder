@@ -91,8 +91,10 @@ The MCP server (`src/mcp/server.ts`) runs as a standalone Node.js process. It:
 | `list_screens` | All screens in the project |
 | `get_devices` | Available device configurations |
 | `get_templates` | Available pre-built templates |
-| `add_text` | Add a text element |
-| `add_rectangle` | Add a rectangle element |
+| `get_patterns` | Available background patterns (waves, lines, dots, geometric) |
+| `add_text` | Add a text element (supports `autoFit` for i18n) |
+| `add_rectangle` | Add a rectangle element (supports `gradient`) |
+| `add_pattern` | Add a background pattern as locked image layer |
 | `add_image` | Add an image element (base64) |
 | `update_element` | Update any element's properties |
 | `delete_element` | Delete an element |
@@ -104,7 +106,7 @@ The MCP server (`src/mcp/server.ts`) runs as a standalone Node.js process. It:
 | `duplicate_screen` | Clone a screen |
 | `remove_screen` | Delete a screen |
 | `update_screen` | Update screen name/background |
-| `set_background` | Set background color |
+| `set_background` | Set background color or gradient |
 | `apply_template` | Apply a pre-built template |
 | `select_elements` | Select elements by ID |
 | `set_zoom` | Set zoom level |

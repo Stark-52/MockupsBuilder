@@ -10,6 +10,7 @@
 import { useEditorStore } from "./store";
 import { DEVICES } from "./devices";
 import { TEMPLATES } from "./templates";
+import { BACKGROUND_PATTERNS } from "./patterns";
 import type { CanvasElement, Screen } from "./types";
 
 const WS_URL = `ws://localhost:${process.env.NEXT_PUBLIC_MCP_WS_PORT || 3333}`;
@@ -156,6 +157,33 @@ function dispatch(method: string, p: Params): unknown {
 
     case "get_templates":
       return TEMPLATES.map((t) => ({ id: t.id, name: t.name, description: t.description, deviceTarget: t.deviceTarget, elementCount: t.elements.length }));
+
+    case "get_patterns":
+      return BACKGROUND_PATTERNS.map((p) => ({ id: p.id, name: p.name, category: p.category }));
+
+    case "add_pattern": {
+      const patternId = str(p.patternId, "");
+      const pat = BACKGROUND_PATTERNS.find((bp) => bp.id === patternId);
+      if (!pat) throw new Error(`Pattern not found: ${patternId}`);
+      const screen = store.getActiveScreen();
+      const proj = store.project;
+      const cw = screen?.canvasWidth ?? proj?.canvasWidth ?? 1290;
+      const ch = screen?.canvasHeight ?? proj?.canvasHeight ?? 2796;
+      const src = pat.generate(cw, ch);
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "image",
+        x: 0, y: 0,
+        width: cw, height: ch,
+        rotation: 0, opacity: num(p.opacity, 1),
+        visible: true, locked: true,
+        name: `Pattern: ${pat.name}`,
+        src,
+      };
+      store.pushHistory();
+      store.setElements([el, ...store.elements]);
+      return { ok: true, id: el.id };
+    }
 
     // ── Element Creation ────────────────────────────────────────
     case "add_text": {

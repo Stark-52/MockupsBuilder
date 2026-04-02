@@ -147,6 +147,29 @@ server.tool(
   },
 );
 
+server.tool(
+  "get_patterns",
+  "List available background patterns (waves, lines, dots, geometric)",
+  {},
+  async () => {
+    const result = await sendCommand("get_patterns");
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
+server.tool(
+  "add_pattern",
+  "Add a background pattern (SVG) as a locked image layer. Great for modern backgrounds.",
+  {
+    patternId: z.string().describe("Pattern ID (use get_patterns to list)"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_pattern", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
 // ─── Element Creation ─────────────────────────────────────────────
 
 server.tool(
