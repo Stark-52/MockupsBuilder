@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "mockups-builder": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "/Users/andygarcia/Documents/GitHub/Mockups Builder"
+    }
+  }
+}
