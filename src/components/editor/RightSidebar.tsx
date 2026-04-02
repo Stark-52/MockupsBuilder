@@ -343,7 +343,7 @@ function AlignmentControls() {
 }
 
 export function RightSidebar() {
-  const { elements, selectedIds, updateElement, pushHistory, backgroundColor, setBackgroundColor, backgroundGradient, setBackgroundGradient } =
+  const { elements, selectedIds, updateElement, pushHistory, backgroundColor, setBackgroundColor, backgroundGradient, setBackgroundGradient, project } =
     useEditorStore();
 
   const selected = selectedIds.length === 1
@@ -357,14 +357,14 @@ export function RightSidebar() {
   };
 
   return (
-    <div className="flex w-80 flex-col border-l border-border bg-background">
-      <div className="px-3 py-2 border-b border-border">
+    <div className="flex w-80 flex-col border-l border-border bg-background overflow-hidden">
+      <div className="px-3 py-2 border-b border-border shrink-0">
         <h3 className="text-xs font-medium truncate">
           {selected ? `${selected.type} — ${selected.name}` : "Properties"}
         </h3>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-3 space-y-3">
           {!selected && (
             <>
@@ -684,7 +684,6 @@ export function RightSidebar() {
 
                   {/* Translations */}
                   {(() => {
-                    const project = useEditorStore.getState().project;
                     const locales = project?.locales ?? [];
                     if (locales.length === 0) return null;
                     const textEl = selected as TextElement;
@@ -924,7 +923,7 @@ export function RightSidebar() {
             </>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

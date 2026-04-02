@@ -53,6 +53,8 @@ export function Toolbar({ onBack }: ToolbarProps) {
     zoom,
     setZoom,
     addElement,
+    activeLocale,
+    setActiveLocale,
     undo,
     redo,
     historyIndex,
@@ -318,22 +320,22 @@ export function Toolbar({ onBack }: ToolbarProps) {
           title="Manage locales"
         >
           <Globe className="h-3.5 w-3.5" />
-          {useEditorStore.getState().activeLocale?.toUpperCase() || "Locales"}
+          {activeLocale?.toUpperCase() || "Locales"}
         </PopoverTrigger>
         <PopoverContent className="w-56 p-2" align="start">
           <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Locales</p>
           {/* Default / base */}
           <button
-            className={`w-full text-left text-xs px-2 py-1.5 rounded ${!useEditorStore.getState().activeLocale ? "bg-accent" : "hover:bg-muted"}`}
-            onClick={() => useEditorStore.getState().setActiveLocale(null)}
+            className={`w-full text-left text-xs px-2 py-1.5 rounded ${!activeLocale ? "bg-accent" : "hover:bg-muted"}`}
+            onClick={() => setActiveLocale(null)}
           >
             Base (default)
           </button>
           {(project?.locales ?? []).map((loc) => (
             <div key={loc} className="flex items-center">
               <button
-                className={`flex-1 text-left text-xs px-2 py-1.5 rounded ${useEditorStore.getState().activeLocale === loc ? "bg-accent" : "hover:bg-muted"}`}
-                onClick={() => useEditorStore.getState().setActiveLocale(loc)}
+                className={`flex-1 text-left text-xs px-2 py-1.5 rounded ${activeLocale === loc ? "bg-accent" : "hover:bg-muted"}`}
+                onClick={() => setActiveLocale(loc)}
               >
                 {loc.toUpperCase()}
               </button>
@@ -343,8 +345,8 @@ export function Toolbar({ onBack }: ToolbarProps) {
                   if (!project) return;
                   const newLocales = (project.locales ?? []).filter((l) => l !== loc);
                   useEditorStore.setState({ project: { ...project, locales: newLocales } });
-                  if (useEditorStore.getState().activeLocale === loc) {
-                    useEditorStore.getState().setActiveLocale(null);
+                  if (activeLocale === loc) {
+                    setActiveLocale(null);
                   }
                 }}
               >
