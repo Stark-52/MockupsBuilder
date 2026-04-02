@@ -681,6 +681,43 @@ export function RightSidebar() {
                       Font shrinks to fit container width. Size above is the maximum.
                     </p>
                   )}
+
+                  {/* Translations */}
+                  {(() => {
+                    const project = useEditorStore.getState().project;
+                    const locales = project?.locales ?? [];
+                    if (locales.length === 0) return null;
+                    const textEl = selected as TextElement;
+                    return (
+                      <>
+                        <Separator />
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Translations</span>
+                          </div>
+                          {locales.map((loc) => (
+                            <div key={loc} className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0 uppercase">{loc}</span>
+                              <Input
+                                className="h-7 text-xs flex-1"
+                                placeholder={textEl.text}
+                                value={textEl.translations?.[loc] ?? ""}
+                                onChange={(e) => {
+                                  const translations = { ...(textEl.translations ?? {}) };
+                                  if (e.target.value) {
+                                    translations[loc] = e.target.value;
+                                  } else {
+                                    delete translations[loc];
+                                  }
+                                  update({ translations } as Partial<TextElement>);
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 

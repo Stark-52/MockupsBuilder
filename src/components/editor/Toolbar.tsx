@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useEditorStore } from "@/lib/store";
 import { getDevice, DEVICES } from "@/lib/devices";
 import { db } from "@/lib/db";
-import { exportStageToPNG, exportAllScreensAsZip, exportBannerSegments, downloadBlob } from "@/lib/export";
+import { exportStageToPNG, exportAllScreensAsZip, exportBannerSegments, exportAllLocales, downloadBlob } from "@/lib/export";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -26,10 +26,17 @@ import {
   FolderArchive,
   Smartphone,
   PanelLeftDashed,
+  Globe,
+  Plus,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import Konva from "konva";
 
 interface ToolbarProps {
@@ -301,6 +308,101 @@ export function Toolbar({ onBack }: ToolbarProps) {
           <span className="text-[10px] text-muted-foreground">segs</span>
         </div>
       )}
+
+      <div className="h-6 w-px bg-border mx-1" />
+
+      {/* Locale selector */}
+      <Popover>
+        <PopoverTrigger
+          className={`inline-flex items-center justify-center gap-1 rounded-md px-2 h-8 text-xs font-medium transition-colors ${project?.locales?.length ? "bg-secondary text-secondary-foreground" : "hover:bg-accent hover:text-accent-foreground"}`}
+          title="Manage locales"
+        >
+          <Globe className="h-3.5 w-3.5" />
+          {useEditorStore.getState().activeLocale?.toUpperCase() || "Locales"}
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Locales</p>
+          {/* Default / base */}
+          <button
+            className={`w-full text-left text-xs px-2 py-1.5 rounded ${!useEditorStore.getState().activeLocale ? "bg-accent" : "hover:bg-muted"}`}
+            onClick={() => useEditorStore.getState().setActiveLocale(null)}
+          >
+            Base (default)
+          </button>
+          {(project?.locales ?? []).map((loc) => (
+            <div key={loc} className="flex items-center">
+              <button
+                className={`flex-1 text-left text-xs px-2 py-1.5 rounded ${useEditorStore.getState().activeLocale === loc ? "bg-accent" : "hover:bg-muted"}`}
+                onClick={() => useEditorStore.getState().setActiveLocale(loc)}
+              >
+                {loc.toUpperCase()}
+              </button>
+              <button
+                className="text-[10px] text-muted-foreground hover:text-destructive px-1"
+                onClick={() => {
+                  if (!project) return;
+                  const newLocales = (project.locales ?? []).filter((l) => l !== loc);
+                  useEditorStore.setState({ project: { ...project, locales: newLocales } });
+                  if (useEditorStore.getState().activeLocale === loc) {
+                    useEditorStore.getState().setActiveLocale(null);
+                  }
+                }}
+              >
+                x
+              </button>
+            </div>
+          ))}
+          <div className="mt-2 flex gap-1">
+            <Input
+              id="new-locale"
+              className="h-7 text-xs flex-1"
+              placeholder="e.g. de, fr, ar"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const val = (e.target as HTMLInputElement).value.trim().toLowerCase();
+                if (!val || !project) return;
+                const locales = [...(project.locales ?? [])];
+                if (!locales.includes(val)) locales.push(val);
+                useEditorStore.setState({ project: { ...project, locales } });
+                (e.target as HTMLInputElement).value = "";
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onClick={() => {
+                const input = document.getElementById("new-locale") as HTMLInputElement;
+                const val = input?.value.trim().toLowerCase();
+                if (!val || !project) return;
+                const locales = [...(project.locales ?? [])];
+                if (!locales.includes(val)) locales.push(val);
+                useEditorStore.setState({ project: { ...project, locales } });
+                input.value = "";
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {(project?.locales?.length ?? 0) > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2 h-7 text-xs"
+              disabled={exporting}
+              onClick={async () => {
+                if (!project || exporting) return;
+                const stageNode = Konva.stages[0];
+                if (!stageNode) return;
+                setExporting(true);
+                try { await exportAllLocales(stageNode, project); } finally { setExporting(false); }
+              }}
+            >
+              {exporting ? "Exporting..." : "Export All Locales"}
+            </Button>
+          )}
+        </PopoverContent>
+      </Popover>
 
       <div className="flex-1" />
 

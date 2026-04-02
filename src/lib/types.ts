@@ -43,6 +43,8 @@ export interface TextElement extends BaseElement {
   align: "left" | "center" | "right";
   lineHeight: number;
   autoFit?: boolean;
+  /** Translations keyed by locale code. Fallback: `text` field. */
+  translations?: Record<string, string>;
 }
 
 export interface ImageElement extends BaseElement {
@@ -102,6 +104,9 @@ export interface Project {
   elements: CanvasElement[];
   screens: Screen[];
   activeScreenIndex: number;
+  /** Available locales (e.g. ["en", "de", "fr", "ar"]) */
+  locales?: string[];
+  activeLocale?: string;
   thumbnail?: string;
   createdAt: number;
   updatedAt: number;

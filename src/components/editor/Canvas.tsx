@@ -623,7 +623,7 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   );
 }
 
-function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool, activeLocale }: {
   el: CanvasElement;
   isSelected: boolean;
   onSelect: () => void;
@@ -631,6 +631,7 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   canvasW: number;
   canvasH: number;
   activeTool: string;
+  activeLocale: string | null;
 }) {
   const shapeRef = useRef<Konva.Shape>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -698,14 +699,15 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   }
 
   if (el.type === "text") {
+    const displayText = (activeLocale && el.translations?.[activeLocale]) || el.text;
     return (
       <>
         <Text
           ref={shapeRef as React.RefObject<Konva.Text>}
           {...commonProps}
-          text={el.text}
+          text={displayText}
           fontSize={el.autoFit
-            ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight)
+            ? calculateAutoFitFontSize(displayText, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight)
             : el.fontSize}
           fontFamily={el.fontFamily}
           fontStyle={getKonvaFontStyle(el.fontWeight, el.fontStyle)}
@@ -779,6 +781,7 @@ export function Canvas() {
     setActiveTool,
     addElement,
     getActiveScreen,
+    activeLocale,
   } = useEditorStore();
 
   const screen = getActiveScreen();
@@ -1116,6 +1119,7 @@ export function Canvas() {
               canvasW={canvasW}
               canvasH={canvasH}
               activeTool={activeTool}
+              activeLocale={activeLocale}
               isSelected={selectedIds.includes(el.id)}
               onSelect={() => {
                 if (activeTool !== "select") return;
@@ -1136,66 +1140,67 @@ export function Canvas() {
             />
           ))}
 
-          {/* Banner segment dividers */}
-          {screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth && (() => {
-            const segW = screen.bannerBaseWidth!;
-            return Array.from({ length: screen.bannerSegments! - 1 }, (_, i) => {
-              const x = (i + 1) * segW;
-              return (
-                <Group key={`seg-${i}`} listening={false}>
-                  <Line
-                    points={[x, 0, x, canvasH]}
-                    stroke="#ff4444"
-                    strokeWidth={3 / zoom}
-                    dash={[12 / zoom, 6 / zoom]}
-                    opacity={0.6}
-                  />
-                  <Rect
-                    x={x - 20 / zoom}
-                    y={6 / zoom}
-                    width={40 / zoom}
-                    height={24 / zoom}
-                    fill="#ff4444"
-                    cornerRadius={4 / zoom}
-                    opacity={0.8}
-                  />
+          {/* Banner overlays — hidden during export */}
+          {screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth && (
+            <Group name="overlays" listening={false}>
+              {(() => {
+                const segW = screen.bannerBaseWidth!;
+                return Array.from({ length: screen.bannerSegments! - 1 }, (_, i) => {
+                  const x = (i + 1) * segW;
+                  return (
+                    <Group key={`seg-${i}`}>
+                      <Line
+                        points={[x, 0, x, canvasH]}
+                        stroke="#ff4444"
+                        strokeWidth={3 / zoom}
+                        dash={[12 / zoom, 6 / zoom]}
+                        opacity={0.6}
+                      />
+                      <Rect
+                        x={x - 20 / zoom}
+                        y={6 / zoom}
+                        width={40 / zoom}
+                        height={24 / zoom}
+                        fill="#ff4444"
+                        cornerRadius={4 / zoom}
+                        opacity={0.8}
+                      />
+                      <Text
+                        x={x - 20 / zoom}
+                        y={8 / zoom}
+                        width={40 / zoom}
+                        height={20 / zoom}
+                        text={`${i + 1}|${i + 2}`}
+                        fontSize={11 / zoom}
+                        fontFamily="SF Pro Display"
+                        fontStyle="bold"
+                        fill="#ffffff"
+                        align="center"
+                      />
+                    </Group>
+                  );
+                });
+              })()}
+              {(() => {
+                const segW = screen.bannerBaseWidth!;
+                return Array.from({ length: screen.bannerSegments! }, (_, i) => (
                   <Text
-                    x={x - 20 / zoom}
-                    y={8 / zoom}
-                    width={40 / zoom}
-                    height={20 / zoom}
-                    text={`${i + 1}|${i + 2}`}
-                    fontSize={11 / zoom}
+                    key={`seg-label-${i}`}
+                    x={i * segW + segW / 2 - 30 / zoom}
+                    y={canvasH - 40 / zoom}
+                    width={60 / zoom}
+                    text={`#${i + 1}`}
+                    fontSize={16 / zoom}
                     fontFamily="SF Pro Display"
                     fontStyle="bold"
-                    fill="#ffffff"
+                    fill="#ff4444"
+                    opacity={0.5}
                     align="center"
                   />
-                </Group>
-              );
-            });
-          })()}
-
-          {/* Segment numbers at top */}
-          {screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth && (() => {
-            const segW = screen.bannerBaseWidth!;
-            return Array.from({ length: screen.bannerSegments! }, (_, i) => (
-              <Text
-                key={`seg-label-${i}`}
-                x={i * segW + segW / 2 - 30 / zoom}
-                y={canvasH - 40 / zoom}
-                width={60 / zoom}
-                text={`#${i + 1}`}
-                fontSize={16 / zoom}
-                fontFamily="SF Pro Display"
-                fontStyle="bold"
-                fill="#ff4444"
-                opacity={0.5}
-                align="center"
-                listening={false}
-              />
-            ));
-          })()}
+                ));
+              })()}
+            </Group>
+          )}
 
           {/* Drag-to-create preview */}
           {drawingRect && drawingRect.w > 2 && drawingRect.h > 2 && (

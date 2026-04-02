@@ -52,6 +52,10 @@ interface EditorState {
   activeTool: "select" | "text" | "rectangle" | "hand";
   setActiveTool: (tool: "select" | "text" | "rectangle" | "hand") => void;
 
+  // Locale
+  activeLocale: string | null;
+  setActiveLocale: (locale: string | null) => void;
+
   // Internal: sync current elements back to project.screens
   _syncToProject: () => void;
 }
@@ -290,6 +294,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Tool
   activeTool: "select",
   setActiveTool: (tool) => set({ activeTool: tool }),
+
+  activeLocale: null,
+  setActiveLocale: (locale) => set({ activeLocale: locale }),
 
   // Internal: write current elements/backgroundColor back to project.screens
   _syncToProject: () => {
