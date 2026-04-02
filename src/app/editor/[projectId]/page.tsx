@@ -23,6 +23,8 @@ export default function EditorPage() {
   // Start MCP bridge for AI agent communication
   useEffect(() => {
     startMcpBridge();
+    // Expose store for AI automation (dev only)
+    (window as any).__editorStore = useEditorStore;
     return () => stopMcpBridge();
   }, []);
 
