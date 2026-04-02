@@ -116,31 +116,80 @@ function getGradientProps(gradient: GradientConfig | undefined | null, width: nu
   return {};
 }
 
-/** Auto-fit: shrink fontSize so text fits within container width */
+/**
+ * Auto-fit: find the largest fontSize where text fills the container
+ * using word-wrap. Maximizes both width and height usage.
+ */
 let _measureCanvas: HTMLCanvasElement | null = null;
+
+function textFitsAt(
+  text: string,
+  fontStr: string,
+  fontFamily: string,
+  fontSize: number,
+  lineHeight: number,
+  maxWidth: number,
+  maxHeight: number,
+  ctx: CanvasRenderingContext2D,
+): boolean {
+  ctx.font = `${fontStr} ${fontSize}px ${fontFamily}`;
+  let totalLines = 0;
+
+  for (const paragraph of text.split("\n")) {
+    if (!paragraph.trim()) { totalLines++; continue; }
+    const words = paragraph.split(/\s+/);
+    let currentLine = "";
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+        totalLines++;
+        currentLine = word;
+        // Single word wider than container → font too big
+        if (ctx.measureText(word).width > maxWidth) return false;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    totalLines++;
+  }
+
+  return totalLines * fontSize * lineHeight <= maxHeight;
+}
+
 function calculateAutoFitFontSize(
   text: string,
   fontFamily: string,
   fontWeight: string,
   fontStyle: string,
-  targetWidth: number,
+  containerWidth: number,
+  containerHeight: number,
   maxFontSize: number,
+  lineHeight: number,
 ): number {
   if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
   const ctx = _measureCanvas.getContext("2d")!;
   const style = getKonvaFontStyle(fontWeight, fontStyle);
-  ctx.font = `${style} ${maxFontSize}px ${fontFamily}`;
+  const pad = 10;
+  const w = containerWidth - pad * 2;
+  const h = containerHeight - pad;
 
-  const lines = text.split("\n");
-  let minScale = 1;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const w = ctx.measureText(line).width;
-    if (w > targetWidth) {
-      minScale = Math.min(minScale, targetWidth / w);
+  // Binary search: largest fontSize that fits
+  let lo = 8;
+  let hi = maxFontSize;
+  let best = lo;
+
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (textFitsAt(text, style, fontFamily, mid, lineHeight, w, h, ctx)) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
     }
   }
-  return Math.max(8, Math.floor(maxFontSize * minScale));
+
+  return best;
 }
 
 /** Open an inline textarea overlay for editing a Text element */
@@ -163,7 +212,7 @@ function openInlineTextEditor(
     top: `${screenY}px`,
     width: `${el.width * zoom}px`,
     height: `${Math.max(el.height * zoom, 40)}px`,
-    fontSize: `${(el.autoFit ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width - 20, el.fontSize) : el.fontSize) * zoom}px`,
+    fontSize: `${(el.autoFit ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight) : el.fontSize) * zoom}px`,
     fontFamily: el.fontFamily,
     fontWeight: el.fontWeight,
     fontStyle: el.fontStyle.includes("italic") ? "italic" : "normal",
@@ -501,7 +550,7 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
           {...commonProps}
           text={el.text}
           fontSize={el.autoFit
-            ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width - 20, el.fontSize)
+            ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width, el.height, el.fontSize, el.lineHeight)
             : el.fontSize}
           fontFamily={el.fontFamily}
           fontStyle={getKonvaFontStyle(el.fontWeight, el.fontStyle)}
