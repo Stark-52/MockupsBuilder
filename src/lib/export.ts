@@ -1,4 +1,34 @@
 import Konva from "konva";
+import { useEditorStore } from "./store";
+import type { Project } from "./types";
+
+export async function exportAllScreensAsZip(
+  stage: Konva.Stage,
+  project: Project,
+): Promise<void> {
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const store = useEditorStore.getState();
+  const originalIndex = store.activeScreenIndex;
+
+  for (let i = 0; i < project.screens.length; i++) {
+    store.setActiveScreenIndex(i);
+    // Wait for React re-render + Konva draw
+    await new Promise((r) => setTimeout(r, 250));
+    stage.draw();
+
+    const screen = project.screens[i];
+    const blob = await exportStageToPNG(stage, screen.canvasWidth, screen.canvasHeight);
+    const safeName = (screen.name || `Screen ${i + 1}`).replace(/[^a-zA-Z0-9_ -]/g, "_");
+    zip.file(`${String(i + 1).padStart(2, "0")}_${safeName}.png`, blob);
+  }
+
+  // Restore original screen
+  store.setActiveScreenIndex(originalIndex);
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(zipBlob, `${project.name || "mockups"}.zip`);
+}
 
 export async function exportStageToPNG(
   stage: Konva.Stage,

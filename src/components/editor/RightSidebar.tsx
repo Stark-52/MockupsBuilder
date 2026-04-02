@@ -661,6 +661,25 @@ export function RightSidebar() {
                       }
                     />
                   </PropertyRow>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-muted-foreground">Auto-Fit</Label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(selected as TextElement).autoFit ?? false}
+                        onChange={(e) => update({ autoFit: e.target.checked } as Partial<TextElement>)}
+                        className="h-3 w-3 rounded border-border accent-primary"
+                      />
+                      <span className="text-[10px] text-muted-foreground">
+                        {(selected as TextElement).autoFit ? "On" : "Off"}
+                      </span>
+                    </label>
+                  </div>
+                  {(selected as TextElement).autoFit && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Font shrinks to fit container width. Size above is the maximum.
+                    </p>
+                  )}
                 </div>
               )}
 

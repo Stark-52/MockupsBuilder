@@ -164,6 +164,7 @@ server.tool(
     fill: z.string().optional().default("#ffffff").describe("Text color (hex)"),
     align: z.enum(["left", "center", "right"]).optional().default("center").describe("Text alignment"),
     lineHeight: z.number().optional().default(1.2).describe("Line height multiplier"),
+    autoFit: z.boolean().optional().default(false).describe("Auto-shrink font size to fit container width (great for i18n)"),
     opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
     rotation: z.number().optional().default(0).describe("Rotation in degrees"),
     name: z.string().optional().default("Text").describe("Layer name"),
@@ -252,6 +253,7 @@ server.tool(
     fill: z.string().optional().describe("Color (text/rectangle elements)"),
     align: z.enum(["left", "center", "right"]).optional().describe("Text alignment"),
     lineHeight: z.number().optional().describe("Line height (text elements only)"),
+    autoFit: z.boolean().optional().describe("Auto-shrink font to fit width (text elements only)"),
     // Rectangle-specific
     stroke: z.string().optional().describe("Stroke color (rectangle elements)"),
     strokeWidth: z.number().optional().describe("Stroke width (rectangle elements)"),

@@ -42,6 +42,7 @@ export interface TextElement extends BaseElement {
   fill: string;
   align: "left" | "center" | "right";
   lineHeight: number;
+  autoFit?: boolean;
 }
 
 export interface ImageElement extends BaseElement {

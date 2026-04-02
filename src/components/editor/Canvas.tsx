@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, GradientConfig, RectangleElement } from "@/lib/types";
+import { CanvasElement, GradientConfig, RectangleElement, TextElement } from "@/lib/types";
 
 // Track drag start position for shift-lock axis constraint
 const dragState: { startX: number; startY: number; axis: "x" | "y" | null; duplicated: boolean } = {
@@ -114,6 +114,100 @@ function getGradientProps(gradient: GradientConfig | undefined | null, width: nu
   }
 
   return {};
+}
+
+/** Auto-fit: shrink fontSize so text fits within container width */
+let _measureCanvas: HTMLCanvasElement | null = null;
+function calculateAutoFitFontSize(
+  text: string,
+  fontFamily: string,
+  fontWeight: string,
+  fontStyle: string,
+  targetWidth: number,
+  maxFontSize: number,
+): number {
+  if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
+  const ctx = _measureCanvas.getContext("2d")!;
+  const style = getKonvaFontStyle(fontWeight, fontStyle);
+  ctx.font = `${style} ${maxFontSize}px ${fontFamily}`;
+
+  const lines = text.split("\n");
+  let minScale = 1;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const w = ctx.measureText(line).width;
+    if (w > targetWidth) {
+      minScale = Math.min(minScale, targetWidth / w);
+    }
+  }
+  return Math.max(8, Math.floor(maxFontSize * minScale));
+}
+
+/** Open an inline textarea overlay for editing a Text element */
+function openInlineTextEditor(
+  el: TextElement,
+  stageContainer: HTMLDivElement,
+  zoom: number,
+  offsetX: number,
+  offsetY: number,
+) {
+  const screenX = offsetX + el.x * zoom;
+  const screenY = offsetY + el.y * zoom;
+  const style = getKonvaFontStyle(el.fontWeight, el.fontStyle);
+
+  const textarea = document.createElement("textarea");
+  textarea.value = el.text;
+  Object.assign(textarea.style, {
+    position: "absolute",
+    left: `${screenX}px`,
+    top: `${screenY}px`,
+    width: `${el.width * zoom}px`,
+    height: `${Math.max(el.height * zoom, 40)}px`,
+    fontSize: `${(el.autoFit ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width - 20, el.fontSize) : el.fontSize) * zoom}px`,
+    fontFamily: el.fontFamily,
+    fontWeight: el.fontWeight,
+    fontStyle: el.fontStyle.includes("italic") ? "italic" : "normal",
+    color: el.fill,
+    textAlign: el.align,
+    lineHeight: String(el.lineHeight),
+    background: "rgba(0,0,0,0.8)",
+    border: "2px solid #3b82f6",
+    borderRadius: "4px",
+    outline: "none",
+    resize: "none",
+    zIndex: "9999",
+    padding: "4px",
+    margin: "0",
+    overflow: "hidden",
+    whiteSpace: "pre-wrap",
+    wordWrap: "break-word",
+  } as Record<string, string>);
+
+  stageContainer.style.position = "relative";
+  stageContainer.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const finish = () => {
+    const store = useEditorStore.getState();
+    store.pushHistory();
+    store.updateElement(el.id, { text: textarea.value } as Partial<TextElement>);
+    textarea.remove();
+  };
+
+  textarea.addEventListener("blur", finish);
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      textarea.removeEventListener("blur", finish);
+      textarea.remove();
+    }
+    // Shift+Enter for newline, Enter alone to confirm
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      textarea.blur();
+    }
+    e.stopPropagation(); // prevent canvas shortcuts
+  });
 }
 
 function makeDragBound(el: CanvasElement, canvasW: number, canvasH: number) {
@@ -406,14 +500,16 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
           ref={shapeRef as React.RefObject<Konva.Text>}
           {...commonProps}
           text={el.text}
-          fontSize={el.fontSize}
+          fontSize={el.autoFit
+            ? calculateAutoFitFontSize(el.text, el.fontFamily, el.fontWeight, el.fontStyle, el.width - 20, el.fontSize)
+            : el.fontSize}
           fontFamily={el.fontFamily}
           fontStyle={getKonvaFontStyle(el.fontWeight, el.fontStyle)}
           fill={el.fill}
           align={el.align}
           lineHeight={el.lineHeight}
           wrap="word"
-          ellipsis={true}
+          ellipsis={!el.autoFit}
         />
         {transformer}
       </>
@@ -691,11 +787,69 @@ export function Canvas() {
   const offsetX = (stageSize.width - canvasW * zoom) / 2;
   const offsetY = (stageSize.height - canvasH * zoom) / 2;
 
+  // Drag & drop images onto canvas
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    for (const file of Array.from(e.dataTransfer.files)) {
+      if (!file.type.startsWith("image/")) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = reader.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+          const maxW = canvasW * 0.8;
+          const scale = Math.min(1, maxW / img.width);
+          addElement({
+            id: crypto.randomUUID(),
+            type: "image",
+            x: canvasW / 2 - (img.width * scale) / 2,
+            y: canvasH / 2 - (img.height * scale) / 2,
+            width: img.width * scale,
+            height: img.height * scale,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            name: file.name,
+            src,
+          });
+        };
+        img.src = src;
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [canvasW, canvasH, addElement]);
+
+  // Double-click on text to edit inline
+  const handleStageDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== "select") return;
+    const target = e.target;
+    if (target === e.target.getStage() || target.attrs?.id === "canvas-bg") return;
+
+    // Find which element was double-clicked
+    const clickedEl = elements.find((el) => {
+      if (el.type !== "text") return false;
+      const node = stageRef.current?.findOne(`#${el.id}`) ?? stageRef.current?.findOne(`.${el.id}`);
+      return node === target;
+    });
+
+    // Fallback: check if any selected text element
+    const textEl = clickedEl || (selectedIds.length === 1
+      ? elements.find((el) => el.id === selectedIds[0] && el.type === "text")
+      : null);
+
+    if (textEl && textEl.type === "text" && containerRef.current) {
+      openInlineTextEditor(textEl as TextElement, containerRef.current, zoom, offsetX, offsetY);
+    }
+  }, [activeTool, elements, selectedIds, zoom, offsetX, offsetY]);
+
   return (
     <div
       ref={containerRef}
       className="flex-1 overflow-hidden bg-muted/50"
       style={{ cursor: activeTool === "hand" ? "grab" : activeTool === "text" || activeTool === "rectangle" ? "crosshair" : "default" }}
+      onDrop={handleDrop}
+      onDragOver={(e) => e.preventDefault()}
     >
       <Stage
         ref={stageRef}
@@ -711,6 +865,7 @@ export function Canvas() {
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onDblClick={handleStageDblClick}
         draggable={activeTool === "hand"}
       >
         <Layer>

@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useEditorStore } from "@/lib/store";
 import { getDevice, DEVICES } from "@/lib/devices";
 import { db } from "@/lib/db";
-import { exportStageToPNG, downloadBlob } from "@/lib/export";
+import { exportStageToPNG, exportAllScreensAsZip, downloadBlob } from "@/lib/export";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -22,6 +23,7 @@ import {
   Undo2,
   Redo2,
   Download,
+  FolderArchive,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -98,6 +100,19 @@ export function Toolbar({ onBack }: ToolbarProps) {
     const h = screen?.canvasHeight ?? project.canvasHeight;
     const blob = await exportStageToPNG(stageNode, w, h);
     downloadBlob(blob, `${project.name}.png`);
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const handleExportAll = async () => {
+    if (!project || exporting) return;
+    const stageNode = Konva.stages[0];
+    if (!stageNode) return;
+    setExporting(true);
+    try {
+      await exportAllScreensAsZip(stageNode, project);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -256,10 +271,24 @@ export function Toolbar({ onBack }: ToolbarProps) {
         Save
       </Button>
 
-      <Button variant="default" size="sm" className="h-8 text-xs" title="Export at full resolution" onClick={handleExport}>
+      <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen" onClick={handleExport}>
         <Download className="h-3.5 w-3.5 mr-1" />
-        Export PNG
+        Export
       </Button>
+
+      {(project?.screens?.length ?? 0) > 1 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs"
+          title="Export all screens as ZIP"
+          disabled={exporting}
+          onClick={handleExportAll}
+        >
+          <FolderArchive className="h-3.5 w-3.5 mr-1" />
+          {exporting ? "Exporting..." : "All ZIP"}
+        </Button>
+      )}
     </div>
   );
 }

@@ -179,6 +179,7 @@ function dispatch(method: string, p: Params): unknown {
         fill: str(p.fill, "#ffffff"),
         align: (p.align as "left" | "center" | "right") || "center",
         lineHeight: num(p.lineHeight, 1.2),
+        ...(p.autoFit ? { autoFit: true } : {}),
       };
       store.addElement(el);
       return { ok: true, id: el.id };
@@ -238,7 +239,7 @@ function dispatch(method: string, p: Params): unknown {
       const allowed = [
         "x", "y", "width", "height", "rotation", "opacity", "visible", "locked", "name",
         "shadowEnabled", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
-        "text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "fill", "align", "lineHeight",
+        "text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "fill", "align", "lineHeight", "autoFit",
         "stroke", "strokeWidth", "cornerRadius", "clipImageSrc", "gradient",
         "src", "deviceId", "screenshotSrc",
       ];
