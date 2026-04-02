@@ -187,6 +187,11 @@ server.tool(
     strokeWidth: z.number().optional().default(0).describe("Stroke width"),
     cornerRadius: z.number().optional().default(0).describe("Corner radius"),
     clipImageSrc: z.string().optional().describe("Data URL of an image to clip inside this rectangle"),
+    gradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().describe("Gradient fill (overrides solid fill)"),
     opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
     rotation: z.number().optional().default(0).describe("Rotation in degrees"),
     name: z.string().optional().default("Rectangle").describe("Layer name"),
@@ -252,6 +257,11 @@ server.tool(
     strokeWidth: z.number().optional().describe("Stroke width (rectangle elements)"),
     cornerRadius: z.number().optional().describe("Corner radius (rectangle elements)"),
     clipImageSrc: z.string().optional().describe("Clip image data URL (rectangle elements)"),
+    gradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().nullable().describe("Gradient fill for rectangles (null to remove)"),
     // Image-specific
     src: z.string().optional().describe("Image data URL (image elements)"),
     // Device-frame-specific
@@ -375,10 +385,20 @@ server.tool(
 
 server.tool(
   "set_background",
-  "Set the background color of the current screen",
-  { color: z.string().describe("Background color (hex, e.g. #1a1a2e)") },
-  async ({ color }) => {
-    const result = await sendCommand("set_background", { color });
+  "Set the background color or gradient of the current screen",
+  {
+    color: z.string().describe("Background color (hex, e.g. #1a1a2e)"),
+    gradient: z.object({
+      type: z.enum(["linear", "radial"]).describe("Gradient type"),
+      angle: z.number().describe("Angle in degrees (linear only)"),
+      stops: z.array(z.object({
+        offset: z.number().min(0).max(1).describe("Stop position (0-1)"),
+        color: z.string().describe("Stop color (hex)"),
+      })).describe("Color stops (min 2)"),
+    }).optional().describe("Gradient config (omit for solid color)"),
+  },
+  async ({ color, gradient }) => {
+    const result = await sendCommand("set_background", { color, gradient: gradient ?? undefined });
     return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
   },
 );

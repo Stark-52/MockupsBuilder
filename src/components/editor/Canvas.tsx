@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, RectangleElement } from "@/lib/types";
+import { CanvasElement, GradientConfig, RectangleElement } from "@/lib/types";
 
 // Track drag start position for shift-lock axis constraint
 const dragState: { startX: number; startY: number; axis: "x" | "y" | null; duplicated: boolean } = {
@@ -81,6 +81,39 @@ function getKonvaFontStyle(fontWeight: string, fontStyle: string): string {
     parts.push("italic");
   }
   return parts.length > 0 ? parts.join(" ") : "normal";
+}
+
+/** Convert GradientConfig to Konva gradient props */
+function getGradientProps(gradient: GradientConfig | undefined | null, width: number, height: number): Record<string, unknown> {
+  if (!gradient || gradient.stops.length < 2) return {};
+  const stops = gradient.stops.flatMap((s) => [s.offset, s.color]);
+
+  if (gradient.type === "linear") {
+    const rad = ((gradient.angle - 90) * Math.PI) / 180;
+    const cx = width / 2;
+    const cy = height / 2;
+    const len = Math.sqrt(width * width + height * height) / 2;
+    return {
+      fill: undefined,
+      fillLinearGradientStartPoint: { x: cx - Math.cos(rad) * len, y: cy - Math.sin(rad) * len },
+      fillLinearGradientEndPoint: { x: cx + Math.cos(rad) * len, y: cy + Math.sin(rad) * len },
+      fillLinearGradientColorStops: stops,
+    };
+  }
+
+  if (gradient.type === "radial") {
+    const r = Math.max(width, height) / 2;
+    return {
+      fill: undefined,
+      fillRadialGradientStartPoint: { x: width / 2, y: height / 2 },
+      fillRadialGradientEndPoint: { x: width / 2, y: height / 2 },
+      fillRadialGradientStartRadius: 0,
+      fillRadialGradientEndRadius: r,
+      fillRadialGradientColorStops: stops,
+    };
+  }
+
+  return {};
 }
 
 function makeDragBound(el: CanvasElement, canvasW: number, canvasH: number) {
@@ -260,7 +293,8 @@ function ClippedRectNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
           y={0}
           width={el.width}
           height={el.height}
-          fill={el.fill}
+          fill={el.gradient ? undefined : el.fill}
+          {...getGradientProps(el.gradient, el.width, el.height)}
           stroke={el.stroke}
           strokeWidth={el.strokeWidth}
           cornerRadius={cr}
@@ -395,7 +429,8 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
         <Rect
           ref={shapeRef as React.RefObject<Konva.Rect>}
           {...commonProps}
-          fill={el.fill}
+          fill={el.gradient ? undefined : el.fill}
+          {...getGradientProps(el.gradient, el.width, el.height)}
           stroke={el.stroke}
           strokeWidth={el.strokeWidth}
           cornerRadius={el.cornerRadius}
@@ -427,6 +462,7 @@ export function Canvas() {
     project,
     elements,
     backgroundColor,
+    backgroundGradient,
     selectedIds,
     setSelectedIds,
     updateElement,
@@ -685,7 +721,8 @@ export function Canvas() {
             y={0}
             width={canvasW}
             height={canvasH}
-            fill={backgroundColor}
+            fill={backgroundGradient ? undefined : backgroundColor}
+            {...getGradientProps(backgroundGradient, canvasW, canvasH)}
             shadowColor="rgba(0,0,0,0.3)"
             shadowBlur={20}
             shadowOffsetX={0}

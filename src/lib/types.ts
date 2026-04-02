@@ -1,5 +1,16 @@
 export type ElementType = "text" | "image" | "rectangle" | "device-frame";
 
+export interface GradientStop {
+  offset: number;
+  color: string;
+}
+
+export interface GradientConfig {
+  type: "linear" | "radial";
+  angle: number;
+  stops: GradientStop[];
+}
+
 export interface BaseElement {
   id: string;
   type: ElementType;
@@ -44,7 +55,8 @@ export interface RectangleElement extends BaseElement {
   stroke: string;
   strokeWidth: number;
   cornerRadius: number;
-  clipImageSrc?: string; // image clipped inside the rectangle
+  clipImageSrc?: string;
+  gradient?: GradientConfig;
 }
 
 export interface DeviceFrameElement extends BaseElement {
@@ -66,6 +78,7 @@ export interface Screen {
   canvasWidth: number;
   canvasHeight: number;
   backgroundColor: string;
+  backgroundGradient?: GradientConfig;
   elements: CanvasElement[];
 }
 
@@ -115,5 +128,6 @@ export interface Template {
   description: string;
   deviceTarget: string;
   backgroundColor: string;
+  backgroundGradient?: GradientConfig;
   elements: CanvasElementWithoutId[];
 }

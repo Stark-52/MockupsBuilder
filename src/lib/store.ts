@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { CanvasElement, Project, Screen } from "./types";
+import { CanvasElement, GradientConfig, Project, Screen } from "./types";
 
 interface HistoryEntry {
   elements: CanvasElement[];
@@ -38,6 +38,8 @@ interface EditorState {
   setZoom: (zoom: number) => void;
   backgroundColor: string;
   setBackgroundColor: (color: string) => void;
+  backgroundGradient: GradientConfig | null;
+  setBackgroundGradient: (gradient: GradientConfig | null) => void;
 
   // History (per-screen)
   history: HistoryEntry[];
@@ -80,6 +82,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeScreenIndex: project.activeScreenIndex || 0,
       elements: screen.elements,
       backgroundColor: screen.backgroundColor,
+      backgroundGradient: screen.backgroundGradient || null,
       history: [{ elements: screen.elements, backgroundColor: screen.backgroundColor }],
       historyIndex: 0,
       selectedIds: [],
@@ -99,6 +102,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeScreenIndex: index,
       elements: screen.elements,
       backgroundColor: screen.backgroundColor,
+      backgroundGradient: screen.backgroundGradient || null,
       history: [{ elements: screen.elements, backgroundColor: screen.backgroundColor }],
       historyIndex: 0,
       selectedIds: [],
@@ -118,6 +122,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeScreenIndex: newIndex,
       elements: screen.elements,
       backgroundColor: screen.backgroundColor,
+      backgroundGradient: screen.backgroundGradient || null,
       history: [{ elements: screen.elements, backgroundColor: screen.backgroundColor }],
       historyIndex: 0,
       selectedIds: [],
@@ -135,6 +140,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeScreenIndex: newIndex,
       elements: screen.elements,
       backgroundColor: screen.backgroundColor,
+      backgroundGradient: screen.backgroundGradient || null,
       history: [{ elements: screen.elements, backgroundColor: screen.backgroundColor }],
       historyIndex: 0,
       selectedIds: [],
@@ -152,7 +158,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       id: crypto.randomUUID(),
       name: source.name + " copy",
     };
-    // Re-assign element IDs
     clone.elements = clone.elements.map((el: CanvasElement) => ({
       ...el,
       id: crypto.randomUUID(),
@@ -165,6 +170,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeScreenIndex: newIndex,
       elements: clone.elements,
       backgroundColor: clone.backgroundColor,
+      backgroundGradient: clone.backgroundGradient || null,
       history: [{ elements: clone.elements, backgroundColor: clone.backgroundColor }],
       historyIndex: 0,
       selectedIds: [],
@@ -180,6 +186,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // If updating current screen's canvas dimensions, reflect immediately
     if (index === get().activeScreenIndex) {
       if (updates.backgroundColor) set({ backgroundColor: updates.backgroundColor });
+      if (updates.backgroundGradient !== undefined) set({ backgroundGradient: updates.backgroundGradient || null });
     }
   },
 
@@ -247,6 +254,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.max(0.05, Math.min(3, zoom)) }),
   backgroundColor: "#1a1a2e",
   setBackgroundColor: (color) => set({ backgroundColor: color }),
+  backgroundGradient: null,
+  setBackgroundGradient: (gradient) => set({ backgroundGradient: gradient }),
 
   // History
   history: [],
@@ -284,13 +293,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Internal: write current elements/backgroundColor back to project.screens
   _syncToProject: () => {
-    const { project, activeScreenIndex, elements, backgroundColor } = get();
+    const { project, activeScreenIndex, elements, backgroundColor, backgroundGradient } = get();
     if (!project) return;
     const newScreens = [...project.screens];
     newScreens[activeScreenIndex] = {
       ...newScreens[activeScreenIndex],
       elements: JSON.parse(JSON.stringify(elements)),
       backgroundColor,
+      backgroundGradient: backgroundGradient || undefined,
     };
     set({ project: { ...project, screens: newScreens } });
   },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, TextElement, RectangleElement, ImageElement } from "@/lib/types";
+import { CanvasElement, TextElement, RectangleElement, ImageElement, GradientConfig, GradientStop } from "@/lib/types";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -25,6 +25,172 @@ import {
   AlignHorizontalSpaceBetween,
   AlignVerticalSpaceBetween,
 } from "lucide-react";
+
+const GRADIENT_PRESETS: { name: string; gradient: GradientConfig }[] = [
+  { name: "Sunset", gradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#ff6b6b" }, { offset: 1, color: "#feca57" }] } },
+  { name: "Ocean", gradient: { type: "linear", angle: 180, stops: [{ offset: 0, color: "#0652DD" }, { offset: 1, color: "#19B5FE" }] } },
+  { name: "Purple", gradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#7c3aed" }, { offset: 1, color: "#ec4899" }] } },
+  { name: "Mint", gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#00b894" }, { offset: 1, color: "#00cec9" }] } },
+  { name: "Night", gradient: { type: "linear", angle: 180, stops: [{ offset: 0, color: "#0f2027" }, { offset: 0.5, color: "#203a43" }, { offset: 1, color: "#2c5364" }] } },
+  { name: "Fire", gradient: { type: "linear", angle: 45, stops: [{ offset: 0, color: "#f12711" }, { offset: 1, color: "#f5af19" }] } },
+  { name: "Aurora", gradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#0f0c29" }, { offset: 0.5, color: "#302b63" }, { offset: 1, color: "#24243e" }] } },
+  { name: "Peach", gradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#ffecd2" }, { offset: 1, color: "#fcb69f" }] } },
+  { name: "Sky", gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#a18cd1" }, { offset: 1, color: "#fbc2eb" }] } },
+  { name: "Neon", gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#00f260" }, { offset: 1, color: "#0575e6" }] } },
+  { name: "Dark Glow", gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#1a1a3e" }, { offset: 0.6, color: "#0f0f23" }, { offset: 1, color: "#000000" }] } },
+  { name: "Warm", gradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#f093fb" }, { offset: 1, color: "#f5576c" }] } },
+];
+
+function gradientToCSS(g: GradientConfig): string {
+  const stops = g.stops.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(", ");
+  if (g.type === "radial") return `radial-gradient(circle, ${stops})`;
+  return `linear-gradient(${g.angle}deg, ${stops})`;
+}
+
+function GradientEditor({
+  gradient,
+  onChange,
+  label,
+}: {
+  gradient: GradientConfig | null | undefined;
+  onChange: (g: GradientConfig | null) => void;
+  label: string;
+}) {
+  const isGradient = !!gradient;
+  const g = gradient || { type: "linear" as const, angle: 135, stops: [{ offset: 0, color: "#7c3aed" }, { offset: 1, color: "#ec4899" }] };
+
+  const updateStop = (index: number, updates: Partial<GradientStop>) => {
+    const newStops = g.stops.map((s, i) => (i === index ? { ...s, ...updates } : s));
+    onChange({ ...g, stops: newStops });
+  };
+
+  const addStop = () => {
+    const last = g.stops[g.stops.length - 1];
+    onChange({ ...g, stops: [...g.stops, { offset: 1, color: last?.color || "#ffffff" }] });
+  };
+
+  const removeStop = (index: number) => {
+    if (g.stops.length <= 2) return;
+    onChange({ ...g, stops: g.stops.filter((_, i) => i !== index) });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <SectionHeader>{label}</SectionHeader>
+        <div className="flex gap-0.5">
+          <Button
+            variant={!isGradient ? "secondary" : "ghost"}
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            onClick={() => onChange(null)}
+          >
+            Solid
+          </Button>
+          <Button
+            variant={isGradient && g.type === "linear" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            onClick={() => onChange({ ...g, type: "linear" })}
+          >
+            Linear
+          </Button>
+          <Button
+            variant={isGradient && g.type === "radial" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            onClick={() => onChange({ ...g, type: "radial" })}
+          >
+            Radial
+          </Button>
+        </div>
+      </div>
+
+      {isGradient && (
+        <>
+          {/* Preview */}
+          <div
+            className="h-8 rounded-md border border-border"
+            style={{ background: gradientToCSS(g) }}
+          />
+
+          {/* Angle (linear only) */}
+          {g.type === "linear" && (
+            <PropertyRow label="Angle">
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={[g.angle]}
+                  onValueChange={(v: number | readonly number[]) => {
+                    const val = typeof v === "number" ? v : v[0];
+                    onChange({ ...g, angle: val });
+                  }}
+                  min={0}
+                  max={360}
+                  step={1}
+                  className="flex-1 py-2"
+                />
+                <span className="text-[10px] text-muted-foreground w-8 text-right">{g.angle}</span>
+              </div>
+            </PropertyRow>
+          )}
+
+          {/* Color Stops */}
+          <div className="space-y-1.5">
+            {g.stops.map((stop, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <input
+                  type="color"
+                  value={stop.color}
+                  onChange={(e) => updateStop(i, { color: e.target.value })}
+                  className="h-6 w-6 rounded border border-border cursor-pointer shrink-0"
+                />
+                <Slider
+                  value={[stop.offset * 100]}
+                  onValueChange={(v: number | readonly number[]) => {
+                    const val = typeof v === "number" ? v : v[0];
+                    updateStop(i, { offset: val / 100 });
+                  }}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="flex-1 py-2"
+                />
+                <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">{Math.round(stop.offset * 100)}%</span>
+                {g.stops.length > 2 && (
+                  <button
+                    className="text-[10px] text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => removeStop(i)}
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+            ))}
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={addStop}>
+              + Add Stop
+            </Button>
+          </div>
+
+          {/* Presets */}
+          <div className="space-y-1">
+            <span className="text-[10px] text-muted-foreground">Presets</span>
+            <div className="grid grid-cols-6 gap-1">
+              {GRADIENT_PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  className="h-6 w-full rounded border border-border hover:ring-1 hover:ring-ring transition-all"
+                  style={{ background: gradientToCSS(p.gradient) }}
+                  title={p.name}
+                  onClick={() => onChange(p.gradient)}
+                />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const FONT_OPTIONS = [
   "SF Pro Display",
@@ -176,7 +342,7 @@ function AlignmentControls() {
 }
 
 export function RightSidebar() {
-  const { elements, selectedIds, updateElement, pushHistory, backgroundColor, setBackgroundColor } =
+  const { elements, selectedIds, updateElement, pushHistory, backgroundColor, setBackgroundColor, backgroundGradient, setBackgroundGradient } =
     useEditorStore();
 
   const selected = selectedIds.length === 1
@@ -203,26 +369,37 @@ export function RightSidebar() {
             <>
               <div className="space-y-2">
                 <SectionHeader>Canvas Background</SectionHeader>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(e) => {
-                      pushHistory();
-                      setBackgroundColor(e.target.value);
-                    }}
-                    className="h-8 w-8 rounded border border-border cursor-pointer"
-                  />
-                  <Input
-                    value={backgroundColor}
-                    onChange={(e) => {
-                      pushHistory();
-                      setBackgroundColor(e.target.value);
-                    }}
-                    className="h-7 text-xs flex-1"
-                  />
-                </div>
+                {!backgroundGradient && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={backgroundColor}
+                      onChange={(e) => {
+                        pushHistory();
+                        setBackgroundColor(e.target.value);
+                      }}
+                      className="h-8 w-8 rounded border border-border cursor-pointer"
+                    />
+                    <Input
+                      value={backgroundColor}
+                      onChange={(e) => {
+                        pushHistory();
+                        setBackgroundColor(e.target.value);
+                      }}
+                      className="h-7 text-xs flex-1"
+                    />
+                  </div>
+                )}
+                <GradientEditor
+                  gradient={backgroundGradient}
+                  label="Fill Mode"
+                  onChange={(g) => {
+                    pushHistory();
+                    setBackgroundGradient(g);
+                  }}
+                />
               </div>
+              <Separator />
               <p className="text-xs text-muted-foreground">
                 Select an element to edit its properties.
               </p>
@@ -491,6 +668,12 @@ export function RightSidebar() {
               {selected.type === "rectangle" && (
                 <div className="space-y-2">
                   <SectionHeader>Rectangle</SectionHeader>
+                  <GradientEditor
+                    gradient={(selected as RectangleElement).gradient}
+                    label="Fill Mode"
+                    onChange={(g) => update({ gradient: g || undefined } as Partial<RectangleElement>)}
+                  />
+                  {!(selected as RectangleElement).gradient && (
                   <PropertyRow label="Fill">
                     <div className="flex items-center gap-2">
                       <input
@@ -510,6 +693,7 @@ export function RightSidebar() {
                       />
                     </div>
                   </PropertyRow>
+                  )}
                   <PropertyRow label="Stroke">
                     <div className="flex items-center gap-2">
                       <input

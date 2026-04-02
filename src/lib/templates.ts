@@ -1,4 +1,4 @@
-import { Template } from "./types";
+import { GradientConfig, Template } from "./types";
 
 export const TEMPLATES: Template[] = [
   {
@@ -255,6 +255,127 @@ export const TEMPLATES: Template[] = [
         align: "center",
         lineHeight: 1.4,
       },
+    ],
+  },
+  // ── Modern Gradient Templates ─────────────────────────────────
+  {
+    id: "aurora-glow",
+    name: "Aurora Glow",
+    description: "Dark background with colorful gradient orbs",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#0a0a1a",
+    elements: [
+      // Background
+      { type: "rectangle", x: 0, y: 0, width: 1290, height: 2796, rotation: 0, opacity: 1, visible: true, locked: true, name: "Background", fill: "#0a0a1a", stroke: "", strokeWidth: 0, cornerRadius: 0 },
+      // Gradient orb top-right
+      { type: "rectangle", x: 600, y: -200, width: 900, height: 900, rotation: 0, opacity: 0.6, visible: true, locked: true, name: "Orb Purple", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 450, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#7c3aed" }, { offset: 0.7, color: "#7c3aed00" }] } as GradientConfig },
+      // Gradient orb bottom-left
+      { type: "rectangle", x: -200, y: 1800, width: 800, height: 800, rotation: 0, opacity: 0.5, visible: true, locked: true, name: "Orb Blue", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 400, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#0ea5e9" }, { offset: 0.7, color: "#0ea5e900" }] } as GradientConfig },
+      // Gradient orb mid
+      { type: "rectangle", x: 400, y: 1200, width: 700, height: 700, rotation: 0, opacity: 0.4, visible: true, locked: true, name: "Orb Pink", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 350, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#ec4899" }, { offset: 0.7, color: "#ec489900" }] } as GradientConfig },
+      // Title
+      { type: "text", x: 95, y: 300, width: 1100, height: 200, rotation: 0, opacity: 1, visible: true, locked: false, name: "Title", text: "Your App", fontSize: 120, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "bold", fill: "#ffffff", align: "center", lineHeight: 1.2 },
+      // Subtitle
+      { type: "text", x: 195, y: 520, width: 900, height: 100, rotation: 0, opacity: 0.7, visible: true, locked: false, name: "Subtitle", text: "Tagline goes here", fontSize: 48, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+    ],
+  },
+  {
+    id: "glass-card",
+    name: "Glass Card",
+    description: "Gradient background with frosted glass card",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#1a1a2e",
+    backgroundGradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#667eea" }, { offset: 1, color: "#764ba2" }] },
+    elements: [
+      // Glass card
+      { type: "rectangle", x: 95, y: 200, width: 1100, height: 500, rotation: 0, opacity: 0.15, visible: true, locked: false, name: "Glass Card", fill: "#ffffff", stroke: "#ffffff", strokeWidth: 1, cornerRadius: 40 },
+      // Title on card
+      { type: "text", x: 145, y: 260, width: 1000, height: 160, rotation: 0, opacity: 1, visible: true, locked: false, name: "Card Title", text: "Feature Name", fontSize: 96, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "bold", fill: "#ffffff", align: "center", lineHeight: 1.2 },
+      // Card subtitle
+      { type: "text", x: 195, y: 440, width: 900, height: 100, rotation: 0, opacity: 0.8, visible: true, locked: false, name: "Card Subtitle", text: "Brief description of the feature", fontSize: 44, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+    ],
+  },
+  {
+    id: "geometric-dark",
+    name: "Geometric Dark",
+    description: "Dark theme with geometric accent shapes",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#0f0f23",
+    elements: [
+      // Background
+      { type: "rectangle", x: 0, y: 0, width: 1290, height: 2796, rotation: 0, opacity: 1, visible: true, locked: true, name: "Background", fill: "#0f0f23", stroke: "", strokeWidth: 0, cornerRadius: 0 },
+      // Diagonal accent bar 1
+      { type: "rectangle", x: -100, y: 400, width: 600, height: 80, rotation: -15, opacity: 0.3, visible: true, locked: true, name: "Accent Bar 1", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 40, gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#7c3aed" }, { offset: 1, color: "#ec4899" }] } as GradientConfig },
+      // Diagonal accent bar 2
+      { type: "rectangle", x: 700, y: 2200, width: 800, height: 60, rotation: -15, opacity: 0.2, visible: true, locked: true, name: "Accent Bar 2", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 30, gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#0ea5e9" }, { offset: 1, color: "#22d3ee" }] } as GradientConfig },
+      // Circle accent
+      { type: "rectangle", x: 900, y: 100, width: 300, height: 300, rotation: 0, opacity: 0.08, visible: true, locked: true, name: "Circle", fill: "#7c3aed", stroke: "", strokeWidth: 0, cornerRadius: 150 },
+      // Small circle
+      { type: "rectangle", x: 100, y: 2400, width: 180, height: 180, rotation: 0, opacity: 0.06, visible: true, locked: true, name: "Circle 2", fill: "#0ea5e9", stroke: "", strokeWidth: 0, cornerRadius: 90 },
+      // Title
+      { type: "text", x: 95, y: 300, width: 1100, height: 200, rotation: 0, opacity: 1, visible: true, locked: false, name: "Title", text: "Bold Feature", fontSize: 120, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "800", fill: "#ffffff", align: "center", lineHeight: 1.2 },
+      // Subtitle
+      { type: "text", x: 195, y: 520, width: 900, height: 100, rotation: 0, opacity: 0.6, visible: true, locked: false, name: "Subtitle", text: "Clean and modern", fontSize: 48, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+    ],
+  },
+  {
+    id: "sunset-gradient",
+    name: "Sunset Gradient",
+    description: "Warm gradient with text overlay",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#ff6b6b",
+    backgroundGradient: { type: "linear", angle: 135, stops: [{ offset: 0, color: "#f12711" }, { offset: 0.5, color: "#f5576c" }, { offset: 1, color: "#feca57" }] },
+    elements: [
+      // Title
+      { type: "text", x: 95, y: 280, width: 1100, height: 300, rotation: 0, opacity: 1, visible: true, locked: false, name: "Title", text: "STUNNING\nDESIGN", fontSize: 140, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "900", fill: "#ffffff", align: "center", lineHeight: 1.1 },
+      // Subtitle
+      { type: "text", x: 195, y: 600, width: 900, height: 100, rotation: 0, opacity: 0.9, visible: true, locked: false, name: "Subtitle", text: "Your app, reimagined", fontSize: 52, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+    ],
+  },
+  {
+    id: "mesh-gradient",
+    name: "Mesh Gradient",
+    description: "Multi-color mesh gradient with floating shapes",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#0a0a1a",
+    backgroundGradient: { type: "linear", angle: 160, stops: [{ offset: 0, color: "#0f0c29" }, { offset: 0.5, color: "#302b63" }, { offset: 1, color: "#24243e" }] },
+    elements: [
+      // Mesh orb 1
+      { type: "rectangle", x: -100, y: -100, width: 800, height: 800, rotation: 0, opacity: 0.5, visible: true, locked: true, name: "Mesh 1", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 400, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#f093fb" }, { offset: 0.8, color: "#f093fb00" }] } as GradientConfig },
+      // Mesh orb 2
+      { type: "rectangle", x: 500, y: 800, width: 1000, height: 1000, rotation: 0, opacity: 0.35, visible: true, locked: true, name: "Mesh 2", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 500, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#00b894" }, { offset: 0.8, color: "#00b89400" }] } as GradientConfig },
+      // Mesh orb 3
+      { type: "rectangle", x: -200, y: 1600, width: 900, height: 900, rotation: 0, opacity: 0.4, visible: true, locked: true, name: "Mesh 3", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 450, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#0ea5e9" }, { offset: 0.8, color: "#0ea5e900" }] } as GradientConfig },
+      // Glass pill badge
+      { type: "rectangle", x: 445, y: 220, width: 400, height: 56, rotation: 0, opacity: 0.15, visible: true, locked: false, name: "Badge", fill: "#ffffff", stroke: "#ffffff", strokeWidth: 1, cornerRadius: 28 },
+      { type: "text", x: 445, y: 230, width: 400, height: 40, rotation: 0, opacity: 0.8, visible: true, locked: false, name: "Badge Text", text: "NEW FEATURE", fontSize: 24, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "600", fill: "#ffffff", align: "center", lineHeight: 1.2 },
+      // Title
+      { type: "text", x: 95, y: 320, width: 1100, height: 200, rotation: 0, opacity: 1, visible: true, locked: false, name: "Title", text: "Next Level", fontSize: 120, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "bold", fill: "#ffffff", align: "center", lineHeight: 1.2 },
+      // Subtitle
+      { type: "text", x: 195, y: 540, width: 900, height: 100, rotation: 0, opacity: 0.7, visible: true, locked: false, name: "Subtitle", text: "Experience the difference", fontSize: 48, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+    ],
+  },
+  {
+    id: "neon-accent",
+    name: "Neon Accent",
+    description: "Dark with neon gradient accents and glow effects",
+    deviceTarget: "iphone-6.7",
+    backgroundColor: "#000000",
+    elements: [
+      // Background
+      { type: "rectangle", x: 0, y: 0, width: 1290, height: 2796, rotation: 0, opacity: 1, visible: true, locked: true, name: "Background", fill: "#0a0a0a", stroke: "", strokeWidth: 0, cornerRadius: 0 },
+      // Neon line top
+      { type: "rectangle", x: 0, y: 0, width: 1290, height: 4, rotation: 0, opacity: 1, visible: true, locked: true, name: "Neon Line", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 0, gradient: { type: "linear", angle: 90, stops: [{ offset: 0, color: "#00f260" }, { offset: 0.5, color: "#0575e6" }, { offset: 1, color: "#7c3aed" }] } as GradientConfig },
+      // Glow behind text
+      { type: "rectangle", x: 345, y: 250, width: 600, height: 300, rotation: 0, opacity: 0.15, visible: true, locked: true, name: "Glow", fill: "", stroke: "", strokeWidth: 0, cornerRadius: 300, gradient: { type: "radial", angle: 0, stops: [{ offset: 0, color: "#0575e6" }, { offset: 1, color: "#0575e600" }] } as GradientConfig },
+      // Title
+      { type: "text", x: 95, y: 300, width: 1100, height: 200, rotation: 0, opacity: 1, visible: true, locked: false, name: "Title", text: "POWER UP", fontSize: 140, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "900", fill: "#ffffff", align: "center", lineHeight: 1.1 },
+      // Subtitle
+      { type: "text", x: 195, y: 520, width: 900, height: 100, rotation: 0, opacity: 0.6, visible: true, locked: false, name: "Subtitle", text: "Unleash your potential", fontSize: 48, fontFamily: "SF Pro Display", fontStyle: "normal", fontWeight: "normal", fill: "#ffffff", align: "center", lineHeight: 1.4 },
+      // Accent dots
+      { type: "rectangle", x: 100, y: 2600, width: 12, height: 12, rotation: 0, opacity: 0.4, visible: true, locked: true, name: "Dot 1", fill: "#00f260", stroke: "", strokeWidth: 0, cornerRadius: 6 },
+      { type: "rectangle", x: 140, y: 2600, width: 12, height: 12, rotation: 0, opacity: 0.3, visible: true, locked: true, name: "Dot 2", fill: "#0575e6", stroke: "", strokeWidth: 0, cornerRadius: 6 },
+      { type: "rectangle", x: 180, y: 2600, width: 12, height: 12, rotation: 0, opacity: 0.2, visible: true, locked: true, name: "Dot 3", fill: "#7c3aed", stroke: "", strokeWidth: 0, cornerRadius: 6 },
     ],
   },
 ];

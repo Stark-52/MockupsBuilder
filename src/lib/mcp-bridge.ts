@@ -202,6 +202,7 @@ function dispatch(method: string, p: Params): unknown {
         strokeWidth: num(p.strokeWidth, 0),
         cornerRadius: num(p.cornerRadius, 0),
         ...(p.clipImageSrc ? { clipImageSrc: str(p.clipImageSrc, "") } : {}),
+        ...(p.gradient ? { gradient: p.gradient as import("./types").GradientConfig } : {}),
       };
       store.addElement(el);
       return { ok: true, id: el.id };
@@ -238,7 +239,7 @@ function dispatch(method: string, p: Params): unknown {
         "x", "y", "width", "height", "rotation", "opacity", "visible", "locked", "name",
         "shadowEnabled", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
         "text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "fill", "align", "lineHeight",
-        "stroke", "strokeWidth", "cornerRadius", "clipImageSrc",
+        "stroke", "strokeWidth", "cornerRadius", "clipImageSrc", "gradient",
         "src", "deviceId", "screenshotSrc",
       ];
       for (const key of allowed) {
@@ -339,6 +340,11 @@ function dispatch(method: string, p: Params): unknown {
       const color = str(p.color, "#1a1a2e");
       store.pushHistory();
       store.setBackgroundColor(color);
+      if (p.gradient) {
+        store.setBackgroundGradient(p.gradient as import("./types").GradientConfig);
+      } else if (p.gradient === null) {
+        store.setBackgroundGradient(null);
+      }
       return { ok: true };
     }
 
@@ -352,6 +358,7 @@ function dispatch(method: string, p: Params): unknown {
       })) as CanvasElement[];
       store.setElements(elements);
       store.setBackgroundColor(tpl.backgroundColor);
+      store.setBackgroundGradient(tpl.backgroundGradient || null);
       return { ok: true, elementCount: elements.length };
     }
 

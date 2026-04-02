@@ -30,6 +30,7 @@ export function LeftSidebar() {
     addElement,
     setElements,
     setBackgroundColor,
+    setBackgroundGradient,
     pushHistory,
   } = useEditorStore();
 
@@ -43,6 +44,7 @@ export function LeftSidebar() {
     })) as CanvasElement[];
     setElements(newElements);
     setBackgroundColor(template.backgroundColor);
+    setBackgroundGradient(template.backgroundGradient || null);
   };
 
   return (
@@ -166,7 +168,14 @@ export function LeftSidebar() {
                 >
                   <div
                     className="mb-2 h-20 rounded-md"
-                    style={{ backgroundColor: template.backgroundColor }}
+                    style={{
+                      backgroundColor: template.backgroundColor,
+                      ...(template.backgroundGradient ? {
+                        background: template.backgroundGradient.type === "radial"
+                          ? `radial-gradient(circle, ${template.backgroundGradient.stops.map(s => `${s.color} ${Math.round(s.offset * 100)}%`).join(", ")})`
+                          : `linear-gradient(${template.backgroundGradient.angle}deg, ${template.backgroundGradient.stops.map(s => `${s.color} ${Math.round(s.offset * 100)}%`).join(", ")})`,
+                      } : {}),
+                    }}
                   />
                   <p className="text-sm font-medium">{template.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
