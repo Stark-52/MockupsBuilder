@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer, Line } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, GradientConfig, RectangleElement, TextElement } from "@/lib/types";
+import { getDevice } from "@/lib/devices";
+import { CanvasElement, DeviceFrameElement, GradientConfig, RectangleElement, TextElement } from "@/lib/types";
 
 // Track drag start position for shift-lock axis constraint
 const dragState: { startX: number; startY: number; axis: "x" | "y" | null; duplicated: boolean } = {
@@ -468,6 +469,160 @@ function ClippedRectNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   );
 }
 
+/** Device frame layout calculations */
+function getFrameLayout(width: number, height: number, category: string) {
+  const shorter = Math.min(width, height);
+  const bezel = shorter * (category === "ipad" ? 0.02 : 0.025);
+  const cornerOuter = shorter * (category === "ipad" ? 0.05 : 0.11);
+  const cornerInner = cornerOuter * 0.82;
+  const isLandscape = width > height;
+
+  return {
+    screenX: bezel,
+    screenY: bezel,
+    screenW: width - bezel * 2,
+    screenH: height - bezel * 2,
+    cornerOuter,
+    cornerInner,
+    bezel,
+    dynamicIsland: category === "iphone" && !isLandscape ? {
+      x: width * 0.35,
+      y: bezel + (height - bezel * 2) * 0.01,
+      w: width * 0.3,
+      h: shorter * 0.025,
+      r: shorter * 0.0125,
+    } : null,
+  };
+}
+
+function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
+  el: DeviceFrameElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (updates: Partial<CanvasElement>) => void;
+  canvasW: number;
+  canvasH: number;
+  activeTool: string;
+}) {
+  const screenshotImage = useImage(el.screenshotSrc);
+  const device = getDevice(el.deviceId);
+  const category = device?.category ?? "iphone";
+  const layout = getFrameLayout(el.width, el.height, category);
+  const groupRef = useRef<Konva.Group>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && groupRef.current) {
+      trRef.current.nodes([groupRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  return (
+    <>
+      <Group
+        ref={groupRef}
+        x={el.x}
+        y={el.y}
+        width={el.width}
+        height={el.height}
+        rotation={el.rotation}
+        opacity={el.opacity}
+        draggable={!el.locked && activeTool === "select"}
+        listening={activeTool === "select"}
+        visible={el.visible}
+        onClick={onSelect}
+        onTap={onSelect}
+        {...getShadowProps(el)}
+        dragBoundFunc={makeDragBound(el, canvasW, canvasH)}
+        onDragStart={(e) => handleDragStart(e, el)}
+        onDragMove={handleDragMove}
+        onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+        onTransformEnd={() => {
+          const node = groupRef.current;
+          if (!node) return;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            x: node.x(), y: node.y(),
+            width: Math.max(50, node.width() * scaleX),
+            height: Math.max(50, node.height() * scaleY),
+            rotation: node.rotation(),
+          });
+        }}
+      >
+        {/* Phone body */}
+        <Rect
+          x={0} y={0}
+          width={el.width} height={el.height}
+          fill="#1a1a1a"
+          cornerRadius={layout.cornerOuter}
+        />
+        {/* Screen area with clipping */}
+        <Group
+          clipFunc={(ctx: Konva.Context) => {
+            const r = layout.cornerInner;
+            const x = layout.screenX;
+            const y = layout.screenY;
+            const w = layout.screenW;
+            const h = layout.screenH;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+          }}
+        >
+          {screenshotImage ? (
+            <KonvaImage
+              image={screenshotImage}
+              x={layout.screenX} y={layout.screenY}
+              width={layout.screenW} height={layout.screenH}
+            />
+          ) : (
+            <Rect
+              x={layout.screenX} y={layout.screenY}
+              width={layout.screenW} height={layout.screenH}
+              fill="#000000"
+            />
+          )}
+        </Group>
+        {/* Dynamic Island */}
+        {layout.dynamicIsland && (
+          <Rect
+            x={layout.dynamicIsland.x}
+            y={layout.dynamicIsland.y}
+            width={layout.dynamicIsland.w}
+            height={layout.dynamicIsland.h}
+            fill="#000000"
+            cornerRadius={layout.dynamicIsland.r}
+          />
+        )}
+      </Group>
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+          boundBoxFunc={(_, newBox) => ({
+            ...newBox,
+            width: Math.max(50, newBox.width),
+            height: Math.max(50, newBox.height),
+          })}
+        />
+      )}
+    </>
+  );
+}
+
 function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
   el: CanvasElement;
   isSelected: boolean;
@@ -582,6 +737,12 @@ function ElementRenderer({ el, isSelected, onSelect, onChange, canvasW, canvasH,
         />
         {transformer}
       </>
+    );
+  }
+
+  if (el.type === "device-frame") {
+    return (
+      <DeviceFrameNode el={el} isSelected={isSelected} onSelect={onSelect} onChange={onChange} canvasW={canvasW} canvasH={canvasH} activeTool={activeTool} />
     );
   }
 
@@ -717,6 +878,20 @@ export function Canvas() {
         if (e.key === "t") useEditorStore.getState().setActiveTool("text");
         if (e.key === "r") useEditorStore.getState().setActiveTool("rectangle");
         if (e.key === "Escape") useEditorStore.getState().clearSelection();
+        // Arrow key nudge (1px, 10px with shift)
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          const store = useEditorStore.getState();
+          if (store.selectedIds.length === 0) return;
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 1;
+          const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+          const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+          store.pushHistory();
+          for (const id of store.selectedIds) {
+            const el = store.elements.find((el) => el.id === id);
+            if (el) store.updateElement(id, { x: el.x + dx, y: el.y + dy });
+          }
+        }
       }
     };
     window.addEventListener("keydown", handler);
@@ -960,6 +1135,67 @@ export function Canvas() {
               }}
             />
           ))}
+
+          {/* Banner segment dividers */}
+          {screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth && (() => {
+            const segW = screen.bannerBaseWidth!;
+            return Array.from({ length: screen.bannerSegments! - 1 }, (_, i) => {
+              const x = (i + 1) * segW;
+              return (
+                <Group key={`seg-${i}`} listening={false}>
+                  <Line
+                    points={[x, 0, x, canvasH]}
+                    stroke="#ff4444"
+                    strokeWidth={3 / zoom}
+                    dash={[12 / zoom, 6 / zoom]}
+                    opacity={0.6}
+                  />
+                  <Rect
+                    x={x - 20 / zoom}
+                    y={6 / zoom}
+                    width={40 / zoom}
+                    height={24 / zoom}
+                    fill="#ff4444"
+                    cornerRadius={4 / zoom}
+                    opacity={0.8}
+                  />
+                  <Text
+                    x={x - 20 / zoom}
+                    y={8 / zoom}
+                    width={40 / zoom}
+                    height={20 / zoom}
+                    text={`${i + 1}|${i + 2}`}
+                    fontSize={11 / zoom}
+                    fontFamily="SF Pro Display"
+                    fontStyle="bold"
+                    fill="#ffffff"
+                    align="center"
+                  />
+                </Group>
+              );
+            });
+          })()}
+
+          {/* Segment numbers at top */}
+          {screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth && (() => {
+            const segW = screen.bannerBaseWidth!;
+            return Array.from({ length: screen.bannerSegments! }, (_, i) => (
+              <Text
+                key={`seg-label-${i}`}
+                x={i * segW + segW / 2 - 30 / zoom}
+                y={canvasH - 40 / zoom}
+                width={60 / zoom}
+                text={`#${i + 1}`}
+                fontSize={16 / zoom}
+                fontFamily="SF Pro Display"
+                fontStyle="bold"
+                fill="#ff4444"
+                opacity={0.5}
+                align="center"
+                listening={false}
+              />
+            ));
+          })()}
 
           {/* Drag-to-create preview */}
           {drawingRect && drawingRect.w > 2 && drawingRect.h > 2 && (

@@ -245,6 +245,26 @@ server.tool(
   },
 );
 
+server.tool(
+  "add_device_frame",
+  "Add a device frame (iPhone/iPad) to the current screen. Drop a screenshot inside it.",
+  {
+    deviceId: z.string().optional().default("iphone-6.7").describe("Device ID (e.g. iphone-6.7, ipad-13)"),
+    x: z.number().describe("X position"),
+    y: z.number().describe("Y position"),
+    width: z.number().optional().describe("Frame width (auto-calculated from height if omitted)"),
+    height: z.number().optional().default(1600).describe("Frame height"),
+    screenshotSrc: z.string().optional().describe("Screenshot data URL (data:image/png;base64,...)"),
+    opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
+    rotation: z.number().optional().default(0).describe("Rotation in degrees"),
+    name: z.string().optional().default("Device Frame").describe("Layer name"),
+  },
+  async (params) => {
+    const result = await sendCommand("add_device_frame", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
+
 // ─── Element Modification ─────────────────────────────────────────
 
 server.tool(

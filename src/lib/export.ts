@@ -30,6 +30,59 @@ export async function exportAllScreensAsZip(
   downloadBlob(zipBlob, `${project.name || "mockups"}.zip`);
 }
 
+export async function exportBannerSegments(
+  stage: Konva.Stage,
+  segmentWidth: number,
+  segmentHeight: number,
+  numSegments: number,
+  projectName: string,
+): Promise<void> {
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+
+  // Save state
+  const prev = {
+    scaleX: stage.scaleX(), scaleY: stage.scaleY(),
+    x: stage.x(), y: stage.y(),
+    width: stage.width(), height: stage.height(),
+  };
+
+  // Reset to 1:1
+  stage.scaleX(1);
+  stage.scaleY(1);
+  stage.x(0);
+  stage.y(0);
+  stage.width(segmentWidth * numSegments);
+  stage.height(segmentHeight);
+  stage.draw();
+
+  for (let i = 0; i < numSegments; i++) {
+    const dataURL = stage.toDataURL({
+      x: i * segmentWidth,
+      y: 0,
+      width: segmentWidth,
+      height: segmentHeight,
+      pixelRatio: 1,
+      mimeType: "image/png",
+    });
+    const res = await fetch(dataURL);
+    const blob = await res.blob();
+    zip.file(`${String(i + 1).padStart(2, "0")}_screenshot.png`, blob);
+  }
+
+  // Restore
+  stage.scaleX(prev.scaleX);
+  stage.scaleY(prev.scaleY);
+  stage.x(prev.x);
+  stage.y(prev.y);
+  stage.width(prev.width);
+  stage.height(prev.height);
+  stage.draw();
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(zipBlob, `${projectName || "banner"}_screenshots.zip`);
+}
+
 export async function exportStageToPNG(
   stage: Konva.Stage,
   width: number,

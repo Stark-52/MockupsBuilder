@@ -237,6 +237,31 @@ function dispatch(method: string, p: Params): unknown {
       return { ok: true, id: el.id };
     }
 
+    case "add_device_frame": {
+      const deviceId = str(p.deviceId, "iphone-6.7");
+      const device = DEVICES.find((d) => d.id === deviceId);
+      if (!device) throw new Error(`Unknown device: ${deviceId}`);
+      const frameH = num(p.height, 1600);
+      const frameW = num(p.width, frameH * (device.width / device.height));
+      const el: CanvasElement = {
+        id: crypto.randomUUID(),
+        type: "device-frame",
+        x: num(p.x, 0),
+        y: num(p.y, 0),
+        width: frameW,
+        height: frameH,
+        rotation: num(p.rotation, 0),
+        opacity: num(p.opacity, 1),
+        visible: true,
+        locked: false,
+        name: str(p.name, "Device Frame"),
+        deviceId,
+        screenshotSrc: p.screenshotSrc ? str(p.screenshotSrc, "") : null,
+      };
+      store.addElement(el);
+      return { ok: true, id: el.id };
+    }
+
     case "add_image": {
       const el: CanvasElement = {
         id: crypto.randomUUID(),

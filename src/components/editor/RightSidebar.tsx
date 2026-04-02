@@ -1,7 +1,8 @@
 "use client";
 
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, TextElement, RectangleElement, ImageElement, GradientConfig, GradientStop } from "@/lib/types";
+import { CanvasElement, TextElement, RectangleElement, ImageElement, DeviceFrameElement, GradientConfig, GradientStop } from "@/lib/types";
+import { DEVICES } from "@/lib/devices";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -819,6 +820,68 @@ export function RightSidebar() {
                   >
                     Replace Image
                   </Button>
+                </div>
+              )}
+
+              {/* Device Frame Properties */}
+              {selected.type === "device-frame" && (
+                <div className="space-y-2">
+                  <SectionHeader>Device Frame</SectionHeader>
+                  <PropertyRow label="Device">
+                    <Select
+                      value={(selected as DeviceFrameElement).deviceId}
+                      onValueChange={(v: string | null) => {
+                        if (v) update({ deviceId: v } as Partial<DeviceFrameElement>);
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DEVICES.filter((d) => d.category !== "mac").map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+                  <PropertyRow label="Screenshot">
+                    <div className="flex items-center gap-1">
+                      {(selected as DeviceFrameElement).screenshotSrc && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[10px] px-1.5"
+                          onClick={() => update({ screenshotSrc: null } as Partial<DeviceFrameElement>)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs flex-1"
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              update({ screenshotSrc: reader.result as string } as Partial<DeviceFrameElement>);
+                            };
+                            reader.readAsDataURL(file);
+                          };
+                          input.click();
+                        }}
+                      >
+                        {(selected as DeviceFrameElement).screenshotSrc ? "Replace" : "Add Screenshot"}
+                      </Button>
+                    </div>
+                  </PropertyRow>
                 </div>
               )}
             </>

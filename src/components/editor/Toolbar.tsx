@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useEditorStore } from "@/lib/store";
 import { getDevice, DEVICES } from "@/lib/devices";
 import { db } from "@/lib/db";
-import { exportStageToPNG, exportAllScreensAsZip, downloadBlob } from "@/lib/export";
+import { exportStageToPNG, exportAllScreensAsZip, exportBannerSegments, downloadBlob } from "@/lib/export";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -24,9 +24,12 @@ import {
   Redo2,
   Download,
   FolderArchive,
+  Smartphone,
+  PanelLeftDashed,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import Konva from "konva";
 
 interface ToolbarProps {
@@ -89,6 +92,91 @@ export function Toolbar({ onBack }: ToolbarProps) {
       reader.readAsDataURL(file);
     };
     input.click();
+  };
+
+  const handleAddDeviceFrame = () => {
+    const screen = useEditorStore.getState().getActiveScreen();
+    const cw = screen?.canvasWidth ?? 1290;
+    const ch = screen?.canvasHeight ?? 2796;
+    const device = getDevice(screen?.deviceTarget ?? "iphone-6.7");
+    // Frame at ~60% of canvas height, centered
+    const frameH = ch * 0.6;
+    const frameW = device ? frameH * (device.width / device.height) : frameH * 0.46;
+    addElement({
+      id: crypto.randomUUID(),
+      type: "device-frame",
+      x: cw / 2 - frameW / 2,
+      y: ch * 0.3,
+      width: frameW,
+      height: frameH,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      name: "Device Frame",
+      deviceId: screen?.deviceTarget ?? "iphone-6.7",
+      screenshotSrc: null,
+    });
+  };
+
+  const currentScreen = useEditorStore.getState().getActiveScreen();
+  const isBanner = (currentScreen?.bannerSegments ?? 0) > 1;
+  const bannerSegs = currentScreen?.bannerSegments ?? 1;
+
+  const toggleBanner = () => {
+    const { activeScreenIndex, updateScreen, getActiveScreen } = useEditorStore.getState();
+    const screen = getActiveScreen();
+    if (!screen) return;
+    const device = getDevice(screen.deviceTarget);
+    const baseW = device?.width ?? 1290;
+
+    if (screen.bannerSegments && screen.bannerSegments > 1) {
+      // Exit banner mode
+      updateScreen(activeScreenIndex, {
+        canvasWidth: baseW,
+        bannerSegments: undefined,
+        bannerBaseWidth: undefined,
+      });
+    } else {
+      // Enter banner mode with 3 segments
+      const segs = 3;
+      updateScreen(activeScreenIndex, {
+        canvasWidth: baseW * segs,
+        bannerSegments: segs,
+        bannerBaseWidth: baseW,
+      });
+    }
+  };
+
+  const setBannerSegments = (segs: number) => {
+    const { activeScreenIndex, updateScreen, getActiveScreen } = useEditorStore.getState();
+    const screen = getActiveScreen();
+    if (!screen || !screen.bannerBaseWidth) return;
+    const clamped = Math.max(2, Math.min(20, segs));
+    updateScreen(activeScreenIndex, {
+      canvasWidth: screen.bannerBaseWidth * clamped,
+      bannerSegments: clamped,
+    });
+  };
+
+  const handleExportBanner = async () => {
+    if (!project || exporting) return;
+    const screen = useEditorStore.getState().getActiveScreen();
+    if (!screen?.bannerBaseWidth || !screen.bannerSegments) return;
+    const stageNode = Konva.stages[0];
+    if (!stageNode) return;
+    setExporting(true);
+    try {
+      await exportBannerSegments(
+        stageNode,
+        screen.bannerBaseWidth,
+        screen.canvasHeight,
+        screen.bannerSegments,
+        project.name,
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleExport = async () => {
@@ -176,6 +264,43 @@ export function Toolbar({ onBack }: ToolbarProps) {
       >
         <ImagePlus className="h-4 w-4" />
       </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        title="Add Device Frame"
+        onClick={handleAddDeviceFrame}
+      >
+        <Smartphone className="h-4 w-4" />
+      </Button>
+
+      <div className="h-6 w-px bg-border mx-1" />
+
+      {/* Banner Mode */}
+      <Button
+        variant={isBanner ? "secondary" : "ghost"}
+        size="sm"
+        className="h-8 text-xs gap-1"
+        title="Banner Mode — one continuous canvas, sliced at export"
+        onClick={toggleBanner}
+      >
+        <PanelLeftDashed className="h-3.5 w-3.5" />
+        Banner
+      </Button>
+      {isBanner && (
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            className="h-7 w-12 text-xs text-center"
+            value={bannerSegs}
+            min={2}
+            max={20}
+            onChange={(e) => setBannerSegments(Number(e.target.value))}
+          />
+          <span className="text-[10px] text-muted-foreground">segs</span>
+        </div>
+      )}
 
       <div className="flex-1" />
 
@@ -271,23 +396,38 @@ export function Toolbar({ onBack }: ToolbarProps) {
         Save
       </Button>
 
-      <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen" onClick={handleExport}>
-        <Download className="h-3.5 w-3.5 mr-1" />
-        Export
-      </Button>
-
-      {(project?.screens?.length ?? 0) > 1 && (
+      {isBanner ? (
         <Button
-          variant="outline"
+          variant="default"
           size="sm"
           className="h-8 text-xs"
-          title="Export all screens as ZIP"
+          title="Export each segment as a separate PNG in a ZIP"
           disabled={exporting}
-          onClick={handleExportAll}
+          onClick={handleExportBanner}
         >
           <FolderArchive className="h-3.5 w-3.5 mr-1" />
-          {exporting ? "Exporting..." : "All ZIP"}
+          {exporting ? "Exporting..." : `Export ${bannerSegs} Segments`}
         </Button>
+      ) : (
+        <>
+          <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen" onClick={handleExport}>
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Export
+          </Button>
+          {(project?.screens?.length ?? 0) > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              title="Export all screens as ZIP"
+              disabled={exporting}
+              onClick={handleExportAll}
+            >
+              <FolderArchive className="h-3.5 w-3.5 mr-1" />
+              {exporting ? "Exporting..." : "All ZIP"}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

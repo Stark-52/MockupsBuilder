@@ -81,6 +81,10 @@ export interface Screen {
   backgroundColor: string;
   backgroundGradient?: GradientConfig;
   elements: CanvasElement[];
+  /** Banner mode: number of segments (>1 = banner, canvas width = device width × segments) */
+  bannerSegments?: number;
+  /** Base device width for one segment (set when entering banner mode) */
+  bannerBaseWidth?: number;
 }
 
 export interface Project {
