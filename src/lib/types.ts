@@ -73,10 +73,18 @@ export interface RectangleElement extends BaseElement {
   gradient?: GradientConfig;
 }
 
+export type DeviceFrameColor = "black" | "silver";
+export type ScreenshotFit = "cover" | "contain" | "fill";
+
 export interface DeviceFrameElement extends BaseElement {
   type: "device-frame";
   deviceId: string;
   screenshotSrc: string | null;
+  frameColor?: DeviceFrameColor;
+  screenshotFit?: ScreenshotFit;
+  skewX?: number;
+  skewY?: number;
+  perspective?: number;
 }
 
 export interface CircleElement extends BaseElement {

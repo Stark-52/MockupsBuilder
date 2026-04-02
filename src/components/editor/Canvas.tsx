@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer, Line, Star, Arrow, Ellipse, Path } from "react-konva";
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Transformer, Line, Star, Arrow, Ellipse, Path, Shape } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "@/lib/store";
 import { getDevice } from "@/lib/devices";
-import { CanvasElement, DeviceFrameElement, GradientConfig, RectangleElement, TextElement, CircleElement, LineElement, StarElement, IconElement } from "@/lib/types";
+import { CanvasElement, DeviceFrameElement, GradientConfig, RectangleElement, TextElement, CircleElement, LineElement, StarElement, IconElement, ScreenshotFit } from "@/lib/types";
 import { ICON_PATHS } from "@/lib/icons";
+import { drawDeviceFrame, getScreenArea, getFrameGeometry } from "@/lib/device-frames";
 
 // Track drag start position for shift-lock axis constraint
 const dragState: { startX: number; startY: number; axis: "x" | "y" | null; duplicated: boolean } = {
@@ -286,6 +287,45 @@ function getBlurFilter(el: CanvasElement) {
   return [Konva.Filters.Blur];
 }
 
+/** Calculate image position/size for cover/contain/fill modes within a container */
+function calculateFit(
+  imgW: number, imgH: number,
+  containerX: number, containerY: number,
+  containerW: number, containerH: number,
+  fit: ScreenshotFit = "cover",
+): { x: number; y: number; width: number; height: number } {
+  if (fit === "fill") {
+    return { x: containerX, y: containerY, width: containerW, height: containerH };
+  }
+  const imgRatio = imgW / imgH;
+  const containerRatio = containerW / containerH;
+  let drawW: number, drawH: number;
+  if (fit === "cover") {
+    if (imgRatio > containerRatio) {
+      drawH = containerH;
+      drawW = drawH * imgRatio;
+    } else {
+      drawW = containerW;
+      drawH = drawW / imgRatio;
+    }
+  } else {
+    // contain
+    if (imgRatio > containerRatio) {
+      drawW = containerW;
+      drawH = drawW / imgRatio;
+    } else {
+      drawH = containerH;
+      drawW = drawH * imgRatio;
+    }
+  }
+  return {
+    x: containerX + (containerW - drawW) / 2,
+    y: containerY + (containerH - drawH) / 2,
+    width: drawW,
+    height: drawH,
+  };
+}
+
 function getFlipProps(el: CanvasElement): { scaleX?: number; scaleY?: number; offsetX?: number; offsetY?: number } {
   const props: { scaleX?: number; scaleY?: number; offsetX?: number; offsetY?: number } = {};
   if (el.flipX) {
@@ -540,32 +580,6 @@ function ClippedRectNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   );
 }
 
-/** Device frame layout calculations */
-function getFrameLayout(width: number, height: number, category: string) {
-  const shorter = Math.min(width, height);
-  const bezel = shorter * (category === "ipad" ? 0.02 : 0.025);
-  const cornerOuter = shorter * (category === "ipad" ? 0.05 : 0.11);
-  const cornerInner = cornerOuter * 0.82;
-  const isLandscape = width > height;
-
-  return {
-    screenX: bezel,
-    screenY: bezel,
-    screenW: width - bezel * 2,
-    screenH: height - bezel * 2,
-    cornerOuter,
-    cornerInner,
-    bezel,
-    dynamicIsland: category === "iphone" && !isLandscape ? {
-      x: width * 0.35,
-      y: bezel + (height - bezel * 2) * 0.01,
-      w: width * 0.3,
-      h: shorter * 0.025,
-      r: shorter * 0.0125,
-    } : null,
-  };
-}
-
 function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH, activeTool }: {
   el: DeviceFrameElement;
   isSelected: boolean;
@@ -578,7 +592,9 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
   const screenshotImage = useImage(el.screenshotSrc);
   const device = getDevice(el.deviceId);
   const category = device?.category ?? "iphone";
-  const layout = getFrameLayout(el.width, el.height, category);
+  const frameColor = el.frameColor ?? "black";
+  const screen = getScreenArea(el.width, el.height, category);
+  const geo = getFrameGeometry(el.width, el.height, category);
   const groupRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
@@ -588,6 +604,17 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
       trRef.current.getLayer()?.batchDraw();
     }
   }, [isSelected]);
+
+  const fit = el.screenshotFit ?? "cover";
+
+  // Perspective / depth simulation
+  const pVal = el.perspective ?? 0;
+  const depthScaleY = 1 - Math.abs(pVal) * 0.005;
+  // Narrow horizontally for foreshortening effect
+  const depthScaleX = 1 - Math.abs(pVal) * 0.002;
+  // Anchor: positive = lean back (bottom stays), negative = lean forward (top stays)
+  const depthOffsetY = pVal > 0 ? el.height * (1 - depthScaleY) : 0;
+  const depthOffsetX = (el.width * (1 - depthScaleX)) / 2;
 
   return (
     <>
@@ -599,12 +626,13 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
         height={el.height}
         rotation={el.rotation}
         opacity={el.opacity}
+        skewX={el.skewX ?? 0}
+        skewY={el.skewY ?? 0}
         draggable={!el.locked && activeTool === "select"}
         listening={activeTool === "select"}
         visible={el.visible}
         onClick={onSelect}
         onTap={onSelect}
-        {...getShadowProps(el)}
         dragBoundFunc={makeDragBound(el, canvasW, canvasH)}
         onDragStart={(e) => handleDragStart(e, el)}
         onDragMove={handleDragMove}
@@ -624,21 +652,49 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
           });
         }}
       >
-        {/* Phone body */}
-        <Rect
-          x={0} y={0}
-          width={el.width} height={el.height}
-          fill="#1a1a1a"
-          cornerRadius={layout.cornerOuter}
+        {/* Shadow — rendered as a Rect behind the device, shadow extends outward */}
+        {el.shadowEnabled && (
+          <Rect
+            x={0}
+            y={0}
+            width={el.width}
+            height={el.height}
+            cornerRadius={geo.cornerOuter}
+            fill={frameColor === "silver" ? "#D1D1D6" : "#1C1C1E"}
+            shadowColor={el.shadowColor ?? "rgba(0,0,0,0.5)"}
+            shadowBlur={el.shadowBlur ?? 10}
+            shadowOffsetX={el.shadowOffsetX ?? 0}
+            shadowOffsetY={el.shadowOffsetY ?? 4}
+            shadowOpacity={el.shadowOpacity ?? 0.5}
+            shadowEnabled={true}
+            shadowForStrokeEnabled={false}
+            listening={false}
+          />
+        )}
+        {/* Perspective depth wrapper */}
+        <Group
+          scaleX={depthScaleX}
+          scaleY={depthScaleY}
+          x={depthOffsetX}
+          y={depthOffsetY}
+        >
+        {/* Device frame body with realistic bezel */}
+        <Shape
+          width={el.width}
+          height={el.height}
+          sceneFunc={(context, shape) => {
+            const ctx = context._context as CanvasRenderingContext2D;
+            drawDeviceFrame(ctx, shape.width(), shape.height(), category, frameColor);
+          }}
         />
         {/* Screen area with clipping */}
         <Group
           clipFunc={(ctx: Konva.Context) => {
-            const r = layout.cornerInner;
-            const x = layout.screenX;
-            const y = layout.screenY;
-            const w = layout.screenW;
-            const h = layout.screenH;
+            const r = screen.cornerRadius;
+            const x = screen.x;
+            const y = screen.y;
+            const w = screen.width;
+            const h = screen.height;
             ctx.beginPath();
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + w - r, y);
@@ -652,31 +708,27 @@ function DeviceFrameNode({ el, isSelected, onSelect, onChange, canvasW, canvasH,
             ctx.closePath();
           }}
         >
-          {screenshotImage ? (
-            <KonvaImage
-              image={screenshotImage}
-              x={layout.screenX} y={layout.screenY}
-              width={layout.screenW} height={layout.screenH}
-            />
-          ) : (
+          {screenshotImage ? (() => {
+            const pos = calculateFit(
+              screenshotImage.naturalWidth, screenshotImage.naturalHeight,
+              screen.x, screen.y, screen.width, screen.height, fit,
+            );
+            return (
+              <KonvaImage
+                image={screenshotImage}
+                x={pos.x} y={pos.y}
+                width={pos.width} height={pos.height}
+              />
+            );
+          })() : (
             <Rect
-              x={layout.screenX} y={layout.screenY}
-              width={layout.screenW} height={layout.screenH}
+              x={screen.x} y={screen.y}
+              width={screen.width} height={screen.height}
               fill="#000000"
             />
           )}
         </Group>
-        {/* Dynamic Island */}
-        {layout.dynamicIsland && (
-          <Rect
-            x={layout.dynamicIsland.x}
-            y={layout.dynamicIsland.y}
-            width={layout.dynamicIsland.w}
-            height={layout.dynamicIsland.h}
-            fill="#000000"
-            cornerRadius={layout.dynamicIsland.r}
-          />
-        )}
+        </Group>
       </Group>
       {isSelected && (
         <Transformer

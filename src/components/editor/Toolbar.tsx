@@ -37,8 +37,6 @@ import {
   Grid3X3,
   Magnet,
   Maximize,
-  Link,
-  Smile,
 } from "lucide-react";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { Input } from "@/components/ui/input";
@@ -361,86 +359,73 @@ export function Toolbar({ onBack }: ToolbarProps) {
 
       <div className="h-6 w-px bg-border mx-1" />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        title="Add Image"
-        onClick={handleAddImage}
-      >
-        <ImagePlus className="h-4 w-4" />
-      </Button>
-
+      {/* Insert menu — Image, URL, Device Frame, Icon */}
       <Popover>
         <PopoverTrigger
-          className="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground"
-          title="Import Image from URL"
+          className="inline-flex items-center justify-center gap-1 rounded-md px-2 h-8 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+          title="Insert element"
         >
-          <Link className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
+          Insert
         </PopoverTrigger>
-        <PopoverContent className="w-72 p-2" align="start">
-          <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Import from URL</p>
-          <div className="flex gap-1">
-            <Input
-              className="h-8 text-xs flex-1"
-              placeholder="https://example.com/image.png"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleImportFromUrl(); }}
-            />
-            <Button
-              variant="default"
-              size="sm"
-              className="h-8 text-xs"
-              disabled={importingUrl || !imageUrl.trim()}
-              onClick={handleImportFromUrl}
-            >
-              {importingUrl ? "..." : "Add"}
-            </Button>
+        <PopoverContent className="w-56 p-1" align="start">
+          <button
+            className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+            onClick={() => { handleAddImage(); document.dispatchEvent(new Event("close-popover")); }}
+          >
+            <ImagePlus className="h-3.5 w-3.5" /> Upload Image
+          </button>
+          <div className="px-2 py-1.5">
+            <p className="text-[10px] text-muted-foreground mb-1">Image from URL</p>
+            <div className="flex gap-1">
+              <Input
+                className="h-7 text-xs flex-1"
+                placeholder="https://example.com/image.png"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleImportFromUrl(); }}
+              />
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs px-2"
+                disabled={importingUrl || !imageUrl.trim()}
+                onClick={handleImportFromUrl}
+              >
+                {importingUrl ? "..." : "Add"}
+              </Button>
+            </div>
           </div>
-        </PopoverContent>
-      </Popover>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        title="Add Device Frame"
-        onClick={handleAddDeviceFrame}
-      >
-        <Smartphone className="h-4 w-4" />
-      </Button>
-
-      <Popover>
-        <PopoverTrigger
-          className="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground"
-          title="Add Icon"
-        >
-          <Smile className="h-4 w-4" />
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-2" align="start">
-          <p className="text-[11px] font-semibold uppercase text-muted-foreground mb-2">Add Icon</p>
-          <ScrollArea className="h-52">
-            {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
-              <div key={category} className="mb-2">
-                <p className="text-[10px] text-muted-foreground font-medium mb-1">{category}</p>
-                <div className="grid grid-cols-8 gap-1">
-                  {icons.map((name) => (
-                    <button
-                      key={name}
-                      className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent cursor-pointer"
-                      title={name}
-                      onClick={() => handleAddIcon(name)}
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d={ICON_PATHS[name]} />
-                      </svg>
-                    </button>
-                  ))}
+          <button
+            className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+            onClick={handleAddDeviceFrame}
+          >
+            <Smartphone className="h-3.5 w-3.5" /> Device Frame
+          </button>
+          <div className="border-t border-border mt-1 pt-1">
+            <p className="text-[10px] text-muted-foreground px-2 mb-1">Icons</p>
+            <ScrollArea className="h-40 px-1">
+              {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
+                <div key={category} className="mb-2">
+                  <p className="text-[10px] text-muted-foreground font-medium mb-1 px-1">{category}</p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {icons.map((name) => (
+                      <button
+                        key={name}
+                        className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent cursor-pointer"
+                        title={name}
+                        onClick={() => handleAddIcon(name)}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          <path d={ICON_PATHS[name]} />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </ScrollArea>
+              ))}
+            </ScrollArea>
+          </div>
         </PopoverContent>
       </Popover>
 
@@ -471,13 +456,12 @@ export function Toolbar({ onBack }: ToolbarProps) {
       {/* Banner Mode */}
       <Button
         variant={isBanner ? "secondary" : "ghost"}
-        size="sm"
-        className="h-8 text-xs gap-1"
+        size="icon"
+        className="h-8 w-8"
         title="Banner Mode — one continuous canvas, sliced at export"
         onClick={toggleBanner}
       >
-        <PanelLeftDashed className="h-3.5 w-3.5" />
-        Banner
+        <PanelLeftDashed className="h-4 w-4" />
       </Button>
       {isBanner && (
         <div className="flex items-center gap-1">
@@ -704,42 +688,46 @@ export function Toolbar({ onBack }: ToolbarProps) {
         Save
       </Button>
 
-      {isBanner ? (
-        <Button
-          variant="default"
-          size="sm"
-          className="h-8 text-xs"
-          title="Export each segment as a separate PNG in a ZIP"
-          disabled={exporting}
-          onClick={handleExportBanner}
+      <Popover>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center gap-1 rounded-md px-2.5 h-8 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          <FolderArchive className="h-3.5 w-3.5 mr-1" />
-          {exporting ? "Exporting..." : `Export ${bannerSegs} Segments`}
-        </Button>
-      ) : (
-        <>
-          <Button variant="default" size="sm" className="h-8 text-xs" title="Export current screen as PNG" onClick={handleExport}>
-            <Download className="h-3.5 w-3.5 mr-1" />
-            PNG
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" title="Export current screen as JPEG" onClick={handleExportJPEG}>
-            JPG
-          </Button>
+          <Download className="h-3.5 w-3.5" />
+          Export
+        </PopoverTrigger>
+        <PopoverContent className="w-48 p-1" align="end">
+          <button
+            className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+            onClick={handleExport}
+          >
+            <Download className="h-3.5 w-3.5" /> PNG
+          </button>
+          <button
+            className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+            onClick={handleExportJPEG}
+          >
+            <Download className="h-3.5 w-3.5" /> JPEG
+          </button>
           {(project?.screens?.length ?? 0) > 1 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              title="Export all screens as ZIP"
+            <button
+              className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer disabled:opacity-50"
               disabled={exporting}
               onClick={handleExportAll}
             >
-              <FolderArchive className="h-3.5 w-3.5 mr-1" />
-              {exporting ? "Exporting..." : "All ZIP"}
-            </Button>
+              <FolderArchive className="h-3.5 w-3.5" /> {exporting ? "Exporting..." : "All Screens (ZIP)"}
+            </button>
           )}
-        </>
-      )}
+          {isBanner && (
+            <button
+              className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent cursor-pointer disabled:opacity-50"
+              disabled={exporting}
+              onClick={handleExportBanner}
+            >
+              <FolderArchive className="h-3.5 w-3.5" /> {exporting ? "Exporting..." : `${bannerSegs} Segments (ZIP)`}
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

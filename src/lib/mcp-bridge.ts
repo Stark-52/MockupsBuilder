@@ -149,6 +149,8 @@ function dispatch(method: string, p: Params): unknown {
         canvasWidth: s.canvasWidth,
         canvasHeight: s.canvasHeight,
         backgroundColor: s.backgroundColor,
+        ...(s.backgroundGradient ? { backgroundGradient: s.backgroundGradient } : {}),
+        ...(s.bannerSegments ? { bannerSegments: s.bannerSegments, bannerBaseWidth: s.bannerBaseWidth } : {}),
         elementCount: s.elements.length,
         active: i === store.activeScreenIndex,
       }));
@@ -209,6 +211,10 @@ function dispatch(method: string, p: Params): unknown {
         align: (p.align as "left" | "center" | "right") || "center",
         lineHeight: num(p.lineHeight, 1.2),
         ...(p.autoFit ? { autoFit: true } : {}),
+        ...(p.strokeColor ? { strokeColor: str(p.strokeColor, "") } : {}),
+        ...(p.strokeWidth !== undefined ? { strokeWidth: num(p.strokeWidth, 0) } : {}),
+        ...(p.gradientFill ? { gradientFill: p.gradientFill as import("./types").GradientConfig } : {}),
+        ...(p.translations ? { translations: p.translations as Record<string, string> } : {}),
       };
       store.addElement(el);
       return { ok: true, id: el.id };
@@ -258,6 +264,11 @@ function dispatch(method: string, p: Params): unknown {
         name: str(p.name, "Device Frame"),
         deviceId,
         screenshotSrc: p.screenshotSrc ? str(p.screenshotSrc, "") : null,
+        frameColor: p.frameColor === "silver" ? "silver" : "black",
+        ...(p.screenshotFit ? { screenshotFit: str(p.screenshotFit, "cover") as "cover" | "contain" | "fill" } : {}),
+        ...(p.skewX !== undefined ? { skewX: num(p.skewX, 0) } : {}),
+        ...(p.skewY !== undefined ? { skewY: num(p.skewY, 0) } : {}),
+        ...(p.perspective !== undefined ? { perspective: num(p.perspective, 0) } : {}),
       };
       store.addElement(el);
       return { ok: true, id: el.id };
@@ -392,7 +403,7 @@ function dispatch(method: string, p: Params): unknown {
         "shadowEnabled", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
         "text", "fontSize", "fontFamily", "fontWeight", "fontStyle", "fill", "align", "lineHeight", "autoFit",
         "stroke", "strokeWidth", "cornerRadius", "clipImageSrc", "gradient",
-        "src", "deviceId", "screenshotSrc",
+        "src", "deviceId", "screenshotSrc", "frameColor", "screenshotFit", "skewX", "skewY", "perspective",
         // New element types
         "lineStart", "lineEnd", "dash",
         "numPoints", "innerRadiusRatio",
@@ -400,6 +411,7 @@ function dispatch(method: string, p: Params): unknown {
         // Effects
         "blurEnabled", "blurRadius", "flipX", "flipY",
         "strokeColor",
+        "gradientFill", "translations",
       ];
       for (const key of allowed) {
         if (p[key] !== undefined) updates[key] = p[key];
@@ -453,13 +465,17 @@ function dispatch(method: string, p: Params): unknown {
       const deviceId = str(p.deviceTarget, "iphone-6.7");
       const device = DEVICES.find((d) => d.id === deviceId);
       if (!device) throw new Error(`Unknown device: ${deviceId}`);
+      const bannerSegs = p.bannerSegments ? num(p.bannerSegments, 0) : 0;
+      const isBanner = bannerSegs >= 2;
       const screen: Screen = {
         id: crypto.randomUUID(),
         name: str(p.name, "New Screen"),
         deviceTarget: deviceId,
-        canvasWidth: device.width,
+        canvasWidth: isBanner ? device.width * bannerSegs : device.width,
         canvasHeight: device.height,
         backgroundColor: str(p.backgroundColor, "#1a1a2e"),
+        ...(p.backgroundGradient ? { backgroundGradient: p.backgroundGradient as import("./types").GradientConfig } : {}),
+        ...(isBanner ? { bannerSegments: bannerSegs, bannerBaseWidth: device.width } : {}),
         elements: [],
       };
       store.addScreen(screen);
@@ -492,6 +508,36 @@ function dispatch(method: string, p: Params): unknown {
         updates.backgroundColor = str(p.backgroundColor, "#1a1a2e");
         if (index === store.activeScreenIndex) {
           store.setBackgroundColor(updates.backgroundColor);
+        }
+      }
+      if (p.backgroundGradient !== undefined) {
+        if (p.backgroundGradient === null) {
+          updates.backgroundGradient = undefined;
+          if (index === store.activeScreenIndex) {
+            store.setBackgroundGradient(null);
+          }
+        } else {
+          updates.backgroundGradient = p.backgroundGradient as import("./types").GradientConfig;
+          if (index === store.activeScreenIndex) {
+            store.setBackgroundGradient(updates.backgroundGradient);
+          }
+        }
+      }
+      if (p.bannerSegments !== undefined) {
+        const segs = num(p.bannerSegments, 1);
+        const screen = store.project?.screens[index];
+        if (screen) {
+          const device = DEVICES.find((d) => d.id === screen.deviceTarget);
+          const baseW = screen.bannerBaseWidth ?? device?.width ?? screen.canvasWidth;
+          if (segs >= 2) {
+            updates.bannerSegments = segs;
+            updates.bannerBaseWidth = baseW;
+            updates.canvasWidth = baseW * segs;
+          } else {
+            updates.bannerSegments = undefined;
+            updates.bannerBaseWidth = undefined;
+            updates.canvasWidth = baseW;
+          }
         }
       }
       store.updateScreen(index, updates);
@@ -546,6 +592,84 @@ function dispatch(method: string, p: Params): unknown {
       store.redo();
       return { ok: true };
 
+    // ── Alignment ───────────────────────────────────────────────
+    case "align_elements": {
+      const ids = (p.ids as string[]) || [];
+      const action = str(p.action, "center-h");
+      const screen = store.getActiveScreen();
+      const proj = store.project;
+      const canvasW = screen?.canvasWidth ?? proj?.canvasWidth ?? 1290;
+      const canvasH = screen?.canvasHeight ?? proj?.canvasHeight ?? 2796;
+      const selectedEls = store.elements.filter((e) => ids.includes(e.id));
+      if (selectedEls.length === 0) throw new Error("No matching elements found");
+
+      // Segment detection for banner mode
+      const getSegBounds = (el: { x: number; width: number }) => {
+        if (screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth) {
+          const segW = screen.bannerBaseWidth;
+          const centerX = el.x + el.width / 2;
+          const segIndex = Math.max(0, Math.min(screen.bannerSegments - 1, Math.floor(centerX / segW)));
+          return { left: segIndex * segW, right: (segIndex + 1) * segW };
+        }
+        return { left: 0, right: canvasW };
+      };
+
+      store.pushHistory();
+
+      if (action === "distribute-h" || action === "distribute-v") {
+        if (selectedEls.length < 3) throw new Error("Distribute requires 3+ elements");
+        if (action === "distribute-h") {
+          const sorted = [...selectedEls].sort((a, b) => a.x - b.x);
+          const minX = sorted[0].x;
+          const maxX = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width;
+          const totalW = sorted.reduce((s, e) => s + e.width, 0);
+          const gap = (maxX - minX - totalW) / (sorted.length - 1);
+          let cx = sorted[0].x + sorted[0].width + gap;
+          for (let i = 1; i < sorted.length - 1; i++) {
+            store.updateElement(sorted[i].id, { x: cx });
+            cx += sorted[i].width + gap;
+          }
+        } else {
+          const sorted = [...selectedEls].sort((a, b) => a.y - b.y);
+          const minY = sorted[0].y;
+          const maxY = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height;
+          const totalH = sorted.reduce((s, e) => s + e.height, 0);
+          const gap = (maxY - minY - totalH) / (sorted.length - 1);
+          let cy = sorted[0].y + sorted[0].height + gap;
+          for (let i = 1; i < sorted.length - 1; i++) {
+            store.updateElement(sorted[i].id, { y: cy });
+            cy += sorted[i].height + gap;
+          }
+        }
+      } else {
+        // Single-element alignment (or align all to bounds)
+        for (const el of selectedEls) {
+          const seg = getSegBounds(el);
+          switch (action) {
+            case "left":
+              store.updateElement(el.id, { x: seg.left });
+              break;
+            case "center-h":
+              store.updateElement(el.id, { x: seg.left + ((seg.right - seg.left) - el.width) / 2 });
+              break;
+            case "right":
+              store.updateElement(el.id, { x: seg.right - el.width });
+              break;
+            case "top":
+              store.updateElement(el.id, { y: 0 });
+              break;
+            case "center-v":
+              store.updateElement(el.id, { y: (canvasH - el.height) / 2 });
+              break;
+            case "bottom":
+              store.updateElement(el.id, { y: canvasH - el.height });
+              break;
+          }
+        }
+      }
+      return { ok: true };
+    }
+
     default:
       throw new Error(`Unknown command: ${method}`);
   }
@@ -576,10 +700,10 @@ function summarizeElement(el: CanvasElement) {
     ...(el.flipX ? { flipX: true } : {}),
     ...(el.flipY ? { flipY: true } : {}),
   };
-  if (el.type === "text") return { ...base, text: el.text, fontSize: el.fontSize, fill: el.fill };
+  if (el.type === "text") return { ...base, text: el.text, fontSize: el.fontSize, fill: el.fill, ...(el.strokeColor ? { strokeColor: el.strokeColor } : {}), ...(el.gradientFill ? { gradientFill: el.gradientFill } : {}), ...(el.translations ? { locales: Object.keys(el.translations) } : {}) };
   if (el.type === "rectangle") return { ...base, fill: el.fill, cornerRadius: el.cornerRadius };
   if (el.type === "image") return { ...base, hasImage: !!el.src };
-  if (el.type === "device-frame") return { ...base, deviceId: el.deviceId };
+  if (el.type === "device-frame") return { ...base, deviceId: el.deviceId, frameColor: el.frameColor ?? "black", screenshotFit: el.screenshotFit ?? "cover", skewX: el.skewX ?? 0, skewY: el.skewY ?? 0, perspective: el.perspective ?? 0 };
   if (el.type === "circle") return { ...base, fill: el.fill };
   if (el.type === "line") return { ...base, stroke: el.stroke, lineStart: el.lineStart, lineEnd: el.lineEnd };
   if (el.type === "star") return { ...base, fill: el.fill, numPoints: el.numPoints, innerRadiusRatio: el.innerRadiusRatio };

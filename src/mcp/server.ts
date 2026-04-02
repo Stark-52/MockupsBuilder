@@ -188,6 +188,14 @@ server.tool(
     align: z.enum(["left", "center", "right"]).optional().default("center").describe("Text alignment"),
     lineHeight: z.number().optional().default(1.2).describe("Line height multiplier"),
     autoFit: z.boolean().optional().default(false).describe("Auto-shrink font size to fit container width (great for i18n)"),
+    strokeColor: z.string().optional().describe("Text stroke/outline color (hex)"),
+    strokeWidth: z.number().optional().describe("Text stroke/outline width"),
+    gradientFill: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().describe("Gradient fill for text (overrides solid fill)"),
+    translations: z.record(z.string(), z.string()).optional().describe("Locale translations, e.g. {\"fr\": \"Bonjour\", \"de\": \"Hallo\"}"),
     opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
     rotation: z.number().optional().default(0).describe("Rotation in degrees"),
     name: z.string().optional().default("Text").describe("Layer name"),
@@ -357,12 +365,17 @@ server.tool(
   "add_device_frame",
   "Add a device frame (iPhone/iPad) to the current screen. Drop a screenshot inside it.",
   {
-    deviceId: z.string().optional().default("iphone-6.7").describe("Device ID (e.g. iphone-6.7, ipad-13)"),
+    deviceId: z.string().optional().default("iphone-6.7").describe("Device ID (e.g. iphone-6.7, ipad-13, mac-2880)"),
     x: z.number().describe("X position"),
     y: z.number().describe("Y position"),
     width: z.number().optional().describe("Frame width (auto-calculated from height if omitted)"),
     height: z.number().optional().default(1600).describe("Frame height"),
     screenshotSrc: z.string().optional().describe("Screenshot data URL (data:image/png;base64,...)"),
+    frameColor: z.enum(["black", "silver"]).optional().default("black").describe("Frame color: black (Space Black/titanium) or silver (aluminum)"),
+    screenshotFit: z.enum(["cover", "contain", "fill"]).optional().default("cover").describe("How the screenshot fits the screen: cover (fill+crop), contain (fit inside), fill (stretch)"),
+    skewX: z.number().optional().default(0).describe("Horizontal tilt in degrees (-5 to 5)"),
+    skewY: z.number().optional().default(0).describe("Vertical tilt in degrees (-5 to 5)"),
+    perspective: z.number().optional().default(0).describe("Depth/perspective effect (-50 to 50, 0=flat)"),
     opacity: z.number().optional().default(1).describe("Opacity (0-1)"),
     rotation: z.number().optional().default(0).describe("Rotation in degrees"),
     name: z.string().optional().default("Device Frame").describe("Layer name"),
@@ -420,6 +433,11 @@ server.tool(
     // Device-frame-specific
     deviceId: z.string().optional().describe("Device ID (device-frame elements)"),
     screenshotSrc: z.string().optional().describe("Screenshot data URL (device-frame elements)"),
+    frameColor: z.enum(["black", "silver"]).optional().describe("Frame color: black or silver (device-frame elements)"),
+    screenshotFit: z.enum(["cover", "contain", "fill"]).optional().describe("Screenshot fit mode: cover, contain, or fill (device-frame elements)"),
+    skewX: z.number().optional().describe("Horizontal tilt -5 to 5 (device-frame elements)"),
+    skewY: z.number().optional().describe("Vertical tilt -5 to 5 (device-frame elements)"),
+    perspective: z.number().optional().describe("Depth/perspective -50 to 50 (device-frame elements)"),
     // Circle-specific (fill, stroke, strokeWidth shared with rectangle)
     // Line-specific
     lineStart: z.enum(["none", "arrow", "dot"]).optional().describe("Line start style (line elements)"),
@@ -438,6 +456,12 @@ server.tool(
     // Text effects
     strokeColor: z.string().optional().describe("Text stroke/outline color (text elements)"),
     textStrokeWidth: z.number().optional().describe("Text stroke/outline width (text elements, maps to strokeWidth)"),
+    gradientFill: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().nullable().describe("Gradient fill for text elements (null to remove)"),
+    translations: z.record(z.string(), z.string()).optional().describe("Locale translations for text elements"),
   },
   async (params) => {
     const result = await sendCommand("update_element", params);
@@ -501,6 +525,12 @@ server.tool(
     name: z.string().optional().default("New Screen").describe("Screen name"),
     deviceTarget: z.string().optional().default("iphone-6.7").describe("Device ID (e.g. iphone-6.7, ipad-13, mac-2880)"),
     backgroundColor: z.string().optional().default("#1a1a2e").describe("Background color (hex)"),
+    backgroundGradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().describe("Background gradient (overrides solid color)"),
+    bannerSegments: z.number().optional().describe("Number of banner segments (≥2 enables banner mode)"),
   },
   async (params) => {
     const result = await sendCommand("add_screen", params);
@@ -540,11 +570,17 @@ server.tool(
 
 server.tool(
   "update_screen",
-  "Update screen properties (name, background color)",
+  "Update screen properties (name, background, banner mode)",
   {
     index: z.number().optional().describe("Screen index (defaults to current)"),
     name: z.string().optional().describe("New screen name"),
     backgroundColor: z.string().optional().describe("New background color (hex)"),
+    backgroundGradient: z.object({
+      type: z.enum(["linear", "radial"]),
+      angle: z.number(),
+      stops: z.array(z.object({ offset: z.number(), color: z.string() })),
+    }).optional().nullable().describe("Background gradient (null to remove)"),
+    bannerSegments: z.number().optional().describe("Number of banner segments (≥2 enables banner, 1 or 0 disables)"),
   },
   async (params) => {
     const result = await sendCommand("update_screen", params);
@@ -553,6 +589,20 @@ server.tool(
 );
 
 // ─── Canvas Operations ────────────────────────────────────────────
+
+server.tool(
+  "align_elements",
+  "Align or distribute selected elements within the current screen (or banner segment). Single element: aligns to canvas/segment bounds. 3+ elements: distribute evenly.",
+  {
+    ids: z.array(z.string()).describe("Element IDs to align/distribute"),
+    action: z.enum(["left", "center-h", "right", "top", "center-v", "bottom", "distribute-h", "distribute-v"])
+      .describe("Alignment action"),
+  },
+  async (params) => {
+    const result = await sendCommand("align_elements", params);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+  },
+);
 
 server.tool(
   "set_background",

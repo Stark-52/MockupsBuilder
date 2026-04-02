@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useEditorStore } from "@/lib/store";
-import { CanvasElement, TextElement, RectangleElement, ImageElement, DeviceFrameElement, GradientConfig, GradientStop, CircleElement, LineElement, StarElement, IconElement } from "@/lib/types";
+import { CanvasElement, TextElement, RectangleElement, ImageElement, DeviceFrameElement, GradientConfig, GradientStop, CircleElement, LineElement, StarElement, IconElement, ScreenshotFit } from "@/lib/types";
 import { DEVICES } from "@/lib/devices";
 import { ICON_NAMES, ICON_CATEGORIES } from "@/lib/icons";
 import { ColorPicker } from "./ColorPicker";
@@ -244,6 +245,21 @@ function NumberInput({
   );
 }
 
+/** Return the x-bounds { left, right } of the segment the element center falls into. */
+function getSegmentBounds(
+  el: { x: number; width: number },
+  screen: { bannerSegments?: number; bannerBaseWidth?: number } | undefined,
+  canvasW: number,
+) {
+  if (screen?.bannerSegments && screen.bannerSegments > 1 && screen.bannerBaseWidth) {
+    const segW = screen.bannerBaseWidth;
+    const centerX = el.x + el.width / 2;
+    const segIndex = Math.max(0, Math.min(screen.bannerSegments - 1, Math.floor(centerX / segW)));
+    return { left: segIndex * segW, right: (segIndex + 1) * segW };
+  }
+  return { left: 0, right: canvasW };
+}
+
 function AlignmentControls() {
   const { elements, selectedIds, updateElement, pushHistory, getActiveScreen, project } = useEditorStore();
   const screen = getActiveScreen();
@@ -258,15 +274,16 @@ function AlignmentControls() {
 
   const align = (action: string) => {
     pushHistory();
+    const seg = getSegmentBounds(selected, screen ?? undefined, canvasW);
     switch (action) {
       case "left":
-        updateElement(selected.id, { x: 0 });
+        updateElement(selected.id, { x: seg.left });
         break;
       case "center-h":
-        updateElement(selected.id, { x: (canvasW - selected.width) / 2 });
+        updateElement(selected.id, { x: seg.left + ((seg.right - seg.left) - selected.width) / 2 });
         break;
       case "right":
-        updateElement(selected.id, { x: canvasW - selected.width });
+        updateElement(selected.id, { x: seg.right - selected.width });
         break;
       case "top":
         updateElement(selected.id, { y: 0 });
@@ -316,22 +333,22 @@ function AlignmentControls() {
       <SectionHeader>Align</SectionHeader>
       <div className="grid grid-cols-6 gap-1">
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Align left" onClick={() => align("left")}>
-          <AlignStartHorizontal className="h-3.5 w-3.5" />
+          <AlignStartVertical className="h-3.5 w-3.5" />
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Center horizontally" onClick={() => align("center-h")}>
           <AlignHorizontalJustifyCenter className="h-3.5 w-3.5" />
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Align right" onClick={() => align("right")}>
-          <AlignEndHorizontal className="h-3.5 w-3.5" />
+          <AlignEndVertical className="h-3.5 w-3.5" />
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Align top" onClick={() => align("top")}>
-          <AlignStartVertical className="h-3.5 w-3.5" />
+          <AlignStartHorizontal className="h-3.5 w-3.5" />
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Center vertically" onClick={() => align("center-v")}>
           <AlignVerticalJustifyCenter className="h-3.5 w-3.5" />
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-full p-0" title="Align bottom" onClick={() => align("bottom")}>
-          <AlignEndVertical className="h-3.5 w-3.5" />
+          <AlignEndHorizontal className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-1">
@@ -353,6 +370,9 @@ export function RightSidebar() {
   const selected = selectedIds.length === 1
     ? elements.find((el) => el.id === selectedIds[0])
     : null;
+
+  const [screenshotUrl, setScreenshotUrl] = useState("");
+  const [importingScreenshot, setImportingScreenshot] = useState(false);
 
   const update = (updates: Partial<CanvasElement>) => {
     if (!selected) return;
@@ -833,7 +853,7 @@ export function RightSidebar() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {DEVICES.filter((d) => d.category !== "mac").map((d) => (
+                        {DEVICES.map((d) => (
                           <SelectItem key={d.id} value={d.id}>
                             {d.name}
                           </SelectItem>
@@ -841,40 +861,176 @@ export function RightSidebar() {
                       </SelectContent>
                     </Select>
                   </PropertyRow>
-                  <PropertyRow label="Screenshot">
-                    <div className="flex items-center gap-1">
-                      {(selected as DeviceFrameElement).screenshotSrc && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[10px] px-1.5"
-                          onClick={() => update({ screenshotSrc: null } as Partial<DeviceFrameElement>)}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs flex-1"
-                        onClick={() => {
-                          const input = document.createElement("input");
-                          input.type = "file";
-                          input.accept = "image/*";
-                          input.onchange = (e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0];
-                            if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              update({ screenshotSrc: reader.result as string } as Partial<DeviceFrameElement>);
-                            };
-                            reader.readAsDataURL(file);
-                          };
-                          input.click();
-                        }}
+                  <PropertyRow label="Color">
+                    <div className="flex gap-1">
+                      <button
+                        className={`h-7 flex-1 rounded text-xs font-medium transition-colors ${
+                          ((selected as DeviceFrameElement).frameColor ?? "black") === "black"
+                            ? "bg-zinc-700 text-white ring-1 ring-zinc-500"
+                            : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800"
+                        }`}
+                        onClick={() => update({ frameColor: "black" } as Partial<DeviceFrameElement>)}
                       >
-                        {(selected as DeviceFrameElement).screenshotSrc ? "Replace" : "Add Screenshot"}
-                      </Button>
+                        Black
+                      </button>
+                      <button
+                        className={`h-7 flex-1 rounded text-xs font-medium transition-colors ${
+                          (selected as DeviceFrameElement).frameColor === "silver"
+                            ? "bg-zinc-300 text-zinc-900 ring-1 ring-zinc-400"
+                            : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800"
+                        }`}
+                        onClick={() => update({ frameColor: "silver" } as Partial<DeviceFrameElement>)}
+                      >
+                        Silver
+                      </button>
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Screenshot">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1">
+                        {(selected as DeviceFrameElement).screenshotSrc && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-[10px] px-1.5"
+                            onClick={() => update({ screenshotSrc: null } as Partial<DeviceFrameElement>)}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs flex-1"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                update({ screenshotSrc: reader.result as string } as Partial<DeviceFrameElement>);
+                              };
+                              reader.readAsDataURL(file);
+                            };
+                            input.click();
+                          }}
+                        >
+                          {(selected as DeviceFrameElement).screenshotSrc ? "Replace" : "Add Screenshot"}
+                        </Button>
+                      </div>
+                      {/* URL import */}
+                      <div className="flex items-center gap-1">
+                        <Input
+                          placeholder="Paste image URL…"
+                          className="h-7 text-xs flex-1"
+                          value={screenshotUrl}
+                          onChange={(e) => setScreenshotUrl(e.target.value)}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2 shrink-0"
+                          disabled={!screenshotUrl || importingScreenshot}
+                          onClick={async () => {
+                            setImportingScreenshot(true);
+                            try {
+                              const resp = await fetch(screenshotUrl);
+                              const blob = await resp.blob();
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                update({ screenshotSrc: reader.result as string } as Partial<DeviceFrameElement>);
+                                setScreenshotUrl("");
+                              };
+                              reader.readAsDataURL(blob);
+                            } catch {
+                              alert("Failed to fetch image from URL");
+                            } finally {
+                              setImportingScreenshot(false);
+                            }
+                          }}
+                        >
+                          {importingScreenshot ? "…" : "Import"}
+                        </Button>
+                      </div>
+                    </div>
+                  </PropertyRow>
+                  {/* Screenshot Fit Mode */}
+                  {(selected as DeviceFrameElement).screenshotSrc && (
+                    <PropertyRow label="Fit">
+                      <div className="flex gap-1">
+                        {(["cover", "contain", "fill"] as ScreenshotFit[]).map((mode) => (
+                          <button
+                            key={mode}
+                            className={`h-7 flex-1 rounded text-xs font-medium capitalize transition-colors ${
+                              ((selected as DeviceFrameElement).screenshotFit ?? "cover") === mode
+                                ? "bg-zinc-700 text-white ring-1 ring-zinc-500"
+                                : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800"
+                            }`}
+                            onClick={() => update({ screenshotFit: mode } as Partial<DeviceFrameElement>)}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                    </PropertyRow>
+                  )}
+                  {/* Tilt / Perspective */}
+                  <SectionHeader>3D Tilt</SectionHeader>
+                  <PropertyRow label="Tilt X">
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[(selected as DeviceFrameElement).skewY ?? 0]}
+                        onValueChange={(v: number | readonly number[]) => {
+                          const val = typeof v === "number" ? v : v[0];
+                          update({ skewY: val } as Partial<DeviceFrameElement>);
+                        }}
+                        min={-5}
+                        max={5}
+                        step={0.1}
+                        className="flex-1 py-2"
+                      />
+                      <span className="text-[10px] text-muted-foreground w-8 text-right">
+                        {((selected as DeviceFrameElement).skewY ?? 0).toFixed(1)}°
+                      </span>
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Tilt Y">
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[(selected as DeviceFrameElement).skewX ?? 0]}
+                        onValueChange={(v: number | readonly number[]) => {
+                          const val = typeof v === "number" ? v : v[0];
+                          update({ skewX: val } as Partial<DeviceFrameElement>);
+                        }}
+                        min={-5}
+                        max={5}
+                        step={0.1}
+                        className="flex-1 py-2"
+                      />
+                      <span className="text-[10px] text-muted-foreground w-8 text-right">
+                        {((selected as DeviceFrameElement).skewX ?? 0).toFixed(1)}°
+                      </span>
+                    </div>
+                  </PropertyRow>
+                  <PropertyRow label="Depth">
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[(selected as DeviceFrameElement).perspective ?? 0]}
+                        onValueChange={(v: number | readonly number[]) => {
+                          const val = typeof v === "number" ? v : v[0];
+                          update({ perspective: val } as Partial<DeviceFrameElement>);
+                        }}
+                        min={-50}
+                        max={50}
+                        step={1}
+                        className="flex-1 py-2"
+                      />
+                      <span className="text-[10px] text-muted-foreground w-8 text-right">
+                        {(selected as DeviceFrameElement).perspective ?? 0}
+                      </span>
                     </div>
                   </PropertyRow>
                 </div>
